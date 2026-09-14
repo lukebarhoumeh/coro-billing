@@ -15,3 +15,14 @@ node_modules/
 dist/
 .idea/
 .vscode/
+
+# Build / test artifacts
+coverage/
+*.log
+.vitest/
+
+# Transcript extraction scratch (regenerate from the .docx as needed)
+data/_transcript_extracted.txt
+
+# Generated pipeline output (invoices, reports) — never source; regenerate from data/
+out/
