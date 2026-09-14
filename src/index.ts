@@ -108,13 +108,15 @@ export type { ChecksContext } from "./reconcile/checks.js";
 export { reconcileAgainstLindita } from "./reconcile/august.js";
 
 // --- QuickBooks export ------------------------------------------------------
+// Pure renderers + the API stub live in quickbooks.ts (browser-importable). The
+// filesystem-bound CsvQuickBooksAdapter is in csvAdapter.ts (Node only).
 export {
   toQuickBooksCsv,
   toIif,
-  CsvQuickBooksAdapter,
   ApiQuickBooksAdapter,
 } from "./export/quickbooks.js";
 export type {
   QuickBooksAdapter,
   QbExportOptions,
 } from "./export/quickbooks.js";
+export { CsvQuickBooksAdapter } from "./export/csvAdapter.js";

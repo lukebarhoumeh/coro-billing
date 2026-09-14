@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 0.65rem;
+  --background: 222 24% 8%;
+  --foreground: 210 20% 96%;
+  --card: 222 22% 11%;
+  --card-foreground: 210 20% 96%;
+  --muted: 220 16% 18%;
+  --muted-foreground: 215 16% 62%;
+  --border: 220 16% 20%;
+  --input: 220 16% 20%;
+  --ring: 199 89% 55%;
+  --primary: 199 89% 52%;
+  --primary-foreground: 222 47% 8%;
+  --accent: 262 83% 66%;
+  --accent-foreground: 210 20% 98%;
+  --success: 152 62% 44%;
+  --success-foreground: 152 40% 96%;
+  --warning: 38 92% 55%;
+  --warning-foreground: 38 60% 10%;
+  --danger: 0 72% 58%;
+  --danger-foreground: 0 40% 98%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numeric alignment for money columns. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

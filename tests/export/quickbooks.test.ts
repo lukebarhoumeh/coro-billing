@@ -15,9 +15,9 @@ import { join } from "node:path";
 import {
   toQuickBooksCsv,
   toIif,
-  CsvQuickBooksAdapter,
   ApiQuickBooksAdapter,
 } from "../../src/export/quickbooks.js";
+import { CsvQuickBooksAdapter } from "../../src/export/csvAdapter.js";
 import { Money } from "../../src/lib/money.js";
 import type { QbInvoice, QbInvoiceLine } from "../../src/domain/types.js";
 

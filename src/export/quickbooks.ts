@@ -10,11 +10,11 @@
  *                       import CSV — one row per invoice LINE.
  *   - toIif           : QuickBooks Desktop IIF (TRNS / SPL / ENDTRNS).
  *
- * Plus adapters implementing a single QuickBooksAdapter port:
- *   - CsvQuickBooksAdapter : writes a CSV file to disk (the "clean export Lindita
- *                            can post" the ARCHITECTURE calls for).
+ * Plus the QuickBooksAdapter port and its stub:
  *   - ApiQuickBooksAdapter : a documented STUB for the QBO Invoice REST API,
  *                            throwing NotConfigured until real OAuth2 wiring lands.
+ * The filesystem-bound CsvQuickBooksAdapter lives in ./csvAdapter.ts (kept separate
+ * so this module stays browser-importable — no node:fs here).
  *
  * Business rules encoded here (README / DATA_CONTRACTS / ARCHITECTURE):
  *   - Customer on the invoice = the MSP (partner). Hub bills the partner, not the
@@ -28,8 +28,6 @@
  */
 import type { QbInvoice, QbInvoiceLine } from "../domain/types.js";
 import { Money } from "../lib/money.js";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 
 // --- shared date / numbering options ---------------------------------------
 
@@ -307,49 +305,6 @@ export interface QuickBooksAdapter {
    * API adapter).
    */
   createInvoices(invoices: QbInvoice[]): Promise<{ created: number; ids: string[] }>;
-}
-
-// --- CsvQuickBooksAdapter ---------------------------------------------------
-
-/**
- * Writes the QBO import CSV to disk — the "clean export Lindita can post" from
- * the ARCHITECTURE roadmap. This is the ONLY adapter allowed filesystem side
- * effects (ARCHITECTURE "Coding standards": side effects only in cli/ and here).
- */
-export class CsvQuickBooksAdapter implements QuickBooksAdapter {
-  private readonly outDir: string;
-  private readonly opts?: QbExportOptions;
-
-  /**
-   * @param outDir directory the CSV is written into (created if missing).
-   * @param opts   injected export dates (kept off the clock for determinism).
-   */
-  constructor(outDir: string, opts?: QbExportOptions) {
-    this.outDir = outDir;
-    this.opts = opts;
-  }
-
-  async createInvoices(invoices: QbInvoice[]): Promise<{ created: number; ids: string[] }> {
-    const csv = toQuickBooksCsv(invoices, this.opts);
-    // mkdir -p: create the (possibly nested) output directory.
-    await mkdir(this.outDir, { recursive: true });
-
-    // Deterministic filename from the invoices' period (falls back to "output").
-    // No timestamp — same close writes the same filename, so re-runs overwrite
-    // rather than pile up.
-    const period = deriverPeriod(invoices);
-    const fileName = period ? `coro-invoices-${period}.csv` : "coro-invoices.csv";
-    await writeFile(join(this.outDir, fileName), csv, "utf8");
-
-    return { created: invoices.length, ids: [fileName] };
-  }
-}
-
-/** The common period across the invoices, or "" if they disagree / list is empty. */
-function deriverPeriod(invoices: readonly QbInvoice[]): string {
-  if (invoices.length === 0) return "";
-  const first = invoices[0]!.period;
-  return invoices.every((i) => i.period === first) ? first : "";
 }
 
 // --- ApiQuickBooksAdapter (documented stub) ---------------------------------
