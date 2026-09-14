@@ -2,291 +2,352 @@
 
 This repository is the working home for **MSP Hub accounting** on the Coro program.
 
-Coro is a new vendor. Hub is acting as a **two-tier distributor**: Coro sells consumption-based cybersecurity licenses to Hub; Hub sells those licenses to MSPs on the MSP Hub platform; those MSPs extend the product to *their* customers. The commercial chain is simple. The monthly paper is not.
+Coro is a new vendor. Hub is a **two-tier distributor**: Coro sells consumption-based cybersecurity licenses to Hub; Hub bills the MSPs on the platform; those MSPs extend Coro to *their* customers.
 
-The near-term deliverable in this repo is documentation plus a `data/` folder of the actual monthly files. The later deliverable is a small web app the accounting team can log into and use at month-end to reconcile and bill. That app is **not** in this commit.
+The spec below is not a generic product brief. It is grounded in a **September 11, 2026** working call with **Dane Gaston** (transcript speaker label: Danny Gaston — Luke’s boss), **Luke Barhoumeh**, and **Lisa Paradis** (Coro accounting). Dane’s wording is the build instruction. The full transcript is in [`data/Call with Luke Barhoumeh (2).docx`](data/Call%20with%20Luke%20Barhoumeh%20(2).docx). Off-topic conversation from the end of that call is not part of this spec.
+
+**What we are replacing:** Lindita’s (Lita’s) manual month-end spreadsheet — the pain that keeps this from scaling.
+
+**What “done” looks like, in Dane’s words:** *we get a usage report from Coro, we plug it into this, it plugs the output into QuickBooks. And Lindita has her invoices.*
 
 ---
 
 ## Who this is for
 
-Primary users: **MSP Hub accounting**.
+Primary operator: **Lindita / MSP Hub accounting**. Dane’s goal is that she does not have to sit in a workbook and look up rates by hand so Hub can scale.
 
-They are not asking for another sales dashboard. They need a trustworthy month-end close for one vendor:
+They are not asking for an MSP-facing portal. They need a trustworthy month-end close for one vendor, then invoices in **QuickBooks**.
 
-1. What did Coro bill Hub?
-2. What usage actually happened?
-3. What are we allowed and supposed to bill each MSP?
-4. How does that compare to what MSPs should bill their end customers?
-5. Where are the SKU, price, and quantity mismatches?
+If a number cannot be traced to a file in `data/` or to a written rate from Coro’s special pricing, it does not belong in the close.
 
-If a number cannot be traced to a file in `data/` or to a written contract term, it does not belong in the close.
+---
+
+## The call that defines the build
+
+**When:** September 11, 2026, 4:12 PM (28m 24s)  
+**Who:** Dane Gaston, Luke Barhoumeh, Lisa Paradis (joined mid-call when Dane pinged her for the missing rate export)
+
+Speech-to-text in the transcript says “Quora / Cora” for **Coro**, “NCP” for **MCP**, “Lead / Lita” for **Lindita**, “Schlak” for **Slack**. This README uses the intended names.
+
+Dane opened it as a discovery conversation. The rest of this file is that conversation turned into a build spec — **his terms kept**.
+
+---
+
+## The problem (Dane’s wording)
+
+> The problem with Coro is around billing and the noise and inconsistencies between the **legacy SKUs**, **current SKUs**, **what our rates are**, and **what we’re supposed to / expected to charge the customers**.
+
+We have a lot of data. That is a good thing. Most of it Dane is aggregating into a **SharePoint** file. SharePoint is the dump, not the close.
+
+The known missing monthly habit: **Coro sends a usage report on about the 1st of every month** for all partners underneath Hub. Dane had a follow-up with Coro on the next Monday; he said we can start building without that piece if we have to. Luke’s later files include `MSP Hub_August 2026 Usage.xlsx` — use it. Do not pretend later months are August.
+
+Partners in that usage file are Hub’s MSPs (Dane walked **Meeting Tree**, **Amplivity**, and others). Customers sit under the partner: you can tell a row is a customer of Amplivity because it is a **child account / workspace**.
+
+On the usage tab Dane called out:
+
+| Field he pointed at | Why it matters |
+| --- | --- |
+| Partner | Who Hub bills (the MSP) |
+| SKU, including **legacy** | “That’s an important thing to know.” |
+| Workspace / child account | End customer under the MSP |
+| Subtype | “Doesn’t really matter, they’re all subscriptions” |
+| Billing / legacy flags | Part of SKU class |
+| U and D | Dane: *I don’t really know what U and D mean.* Do not invent. Flag unknown. |
+| Product | What was actually consumed |
+
+**Partners are not on one rate card.** Dane: *the problem is all these partners are on different stuff.* Flower-X-style exceptions are real. Do not assume one Hub-wide price per SKU.
+
+---
+
+## The thing to replace
+
+Lindita already has a **manual August billing workbook**. That file is *hers* — it is not the file Coro delivers. Dane: *this one is all Lindita* vs *this is the one that gets delivered to us.*
+
+Luke needs **both**:
+
+1. **Original / delivered files** (usage, invoices, MSRP, agreement, Coro pricing exports)
+2. **Lindita’s workbook** — the internal output to **mimic**. It is not sent to the customer. It is how Hub figures the bill, then invoices go out.
+
+Dane, on August:
+
+> This is August billing, essentially. We’re billing 16,000, 3,000 in profit. This is like a no-brainer if we can automate it. It’s just money that comes in if we can automate this. Otherwise, Lindita has to sit here and go find, okay, here’s the partner rate. Here’s our price.
+
+Then he corrected the column names:
+
+> Here’s **our rate**, here’s **the price**, and then the margin stuff’s automatically calculated. But these two columns are **H, our price**, and **what we’re charging, L**. If we can automate those. **That is the key.**
+
+| Column in Lindita’s August file | Meaning (Dane) |
+| --- | --- |
+| **H — our price** | Hub’s cost / our rate |
+| **L — what we’re charging** | What Hub charges the partner (the MSP) |
+| Margin columns | Already calculated once H and L exist — do not make margin the hard part |
+
+Luke: *And this is what you want to be replaced.*  
+Dane: **Yes, this is what I want to replace.**
+
+---
+
+## The magic sauce
+
+Dane, on pairing usage with rates:
+
+> What I would love to see is like **what our rate is** and **what is the rate that we’re charging**. Amplivity is going to get a bill from us for all of this stuff. We break it down **by customer**. … We need to know like **what our cost is** and **what we’re charging the customer**. If we can get that information **paired with this**, that’s the **magic sauce** and **put that into QuickBooks**, we can automate this whole thing.
+
+So the product is not “another SharePoint.” It is:
+
+```text
+Coro usage report (1st of month, all partners under Hub)
+        +
+Hub cost (our price / column H)
+        +
+Partner sell price (what we’re charging / column L)
+        =
+per-MSP, broken down by customer
+        →
+QuickBooks invoices for Lindita
+```
+
+Luke asked if we connect this to QuickBooks. Dane: **Ideally, yes.**
+
+Perfect-world pipeline, Dane’s words:
+
+> We get a usage report from Coro, we plug it into this, it plugs the output into QuickBooks. And Lindita has her invoices.
+
+“This” is the automated version of Lindita’s workbook (columns H and L filled, margin following). It is **internal**. Invoices to partners come from QuickBooks, not from emailing that spreadsheet.
+
+Dane also said we already have almost everything **except those two prices**:
+
+> We have all of the data except for our price and their price here. This is everything we need minus those two things.
+
+Luke: structure the pipeline now; when Jack’s rates land, it is plug-and-play. Dane agreed.
 
 ---
 
 ## Commercial model
 
 ```text
-Coro  --(licenses + invoices to Hub)-->  MSP Hub (distributor)
-                                              |
-                                              |  Hub bills MSPs
-                                              v
-                                         MSP on the platform
-                                              |
-                                              |  MSP bills their customer
-                                              v
-                                         End customer (consumption)
+Coro  --(usage + invoices + special pricing)-->  MSP Hub (distributor)
+                                                    |
+                                                    |  Hub bills the MSP (QuickBooks)
+                                                    |  break down by customer
+                                                    v
+                                               MSP on the platform
+                                               (Amplivity, Meeting Tree, …)
+                                                    |
+                                                    |  MSP bills their customer
+                                                    v
+                                               End customer (child workspace)
 ```
 
-**Coro** sells consumption-based cybersecurity for MSPs. Usage (seats, endpoints, modules — the exact unit of measure lives in the usage file and the invoice lines, not in this paragraph) drives cost.
+Hub is not the MSP of record for the end customer. Hub’s customer is the partner. Usage is still at customer/workspace grain because that is how the bill is explained.
 
-**MSP Hub** is the distributor. The governing document is the *MSP Hub – Coro Hybrid Distributor Agreement (2 tier)* (Word + PDF in `data/`). “Hybrid” and “2 tier” matter: Hub is not the MSP of record for the end customer. Hub’s customer is the MSP. The MSP’s customer is the business that actually consumes Coro.
+**5% buffer (from the agreement, Dane):** *we should have a 5% buffer on anything.* Example he gave: if a legacy deal is a **60%** discount, Hub should automatically get **65%**.
 
-**MSPs** buy through Hub and extend Coro to end customers. They have their own billing relationship downstream. Hub still needs to know that downstream picture because:
+**Lisa (Coro) on legacy cost:**
 
-- usage is often recorded at customer or tenant grain
-- SKU names on Coro invoices, MSRP, usage, and MSP quotes do not always match
-- “what we charged” and “what we were supposed to charge” have already drifted
+- Cost lives on **Brandon and Jack’s special pricing spreadsheet**.
+- *The legacy SKUs, that’s their pricing now. … What legacy says in there is the cost, and then your **45% discount**. … It’s straight across the board for anyone on Legacy.*
+- *Anything with legacy, it’s the legacy SKU cost in that tab and 45%. And that’s what it is.*
+- *This is what we bill you guys, the list price with the 45% discount. And that’s yours.*
 
-**Costs from Coro to Hub are not disclosed in this repo yet.** That is intentional. The invoice files tell Hub what Coro *invoiced*. They do not automatically tell accounting Hub’s true unit cost, margin, or the MSP sell price. Until a cost schedule is added (under access control), the system must treat cost as a separate, missing input — not something to reverse-engineer from MSRP.
+Dane then had to separate **our price** vs **net price to MSP**:
 
----
+> Wait, these are our price. Net price to MSP. … That’s not us. I get confused because so this is **their, the partner price**. This is **our price** with the note of like the **5% buffer** if they’re these guys.
 
-## The problem
+**Current SKUs:** Dane said they may already have what each partner should be charged for the new SKUs. **Legacy SKUs** are the landmine:
 
-Billing on this program is noisy. Accounting is being asked to close a month from a pile of spreadsheets and a contract, while four different “truths” disagree.
+> What we don’t have is like what rates are these guys on the legacy SKUs. Because we’re going to run into problems where we’re like, Brandon said you guys get this for **$6**, but you guys are charging us **$9**.
 
-### 1. SKU noise
+Lisa: Coro has been moving people **off Legacy onto AI**; keep legacy in a **separate tab/export** because those rows are still changing. Dane’s ask to Jack (via Lisa): **the exact same format as current — per partner, per SKU, their price and our price.** Discount percent is nice-to-have; *I just need their price and our price.*
 
-The same commercial thing shows up under different codes, descriptions, and bundles:
-
-- **Current SKUs** — what Coro sells now, and what new MSP deals should use
-- **Legacy SKUs** — older codes still on invoices, usage, or customer records
-- **Noise** — credits, one-time lines, tax, rounding, internal/test tenants, duplicate invoice attachments (`(1)` on a filename), rows that look like products but are not billable
-
-Until those three buckets are explicit, every pivot table is an argument.
-
-### 2. Price noise
-
-There are at least four price layers, and they are not interchangeable:
-
-| Layer | Who it is for | What we have today |
-| --- | --- | --- |
-| MSRP / list | Catalog reference | `Copy of 2607-MSRP Pricing.xlsx` |
-| Coro → Hub cost | Distributor cost | **Not disclosed yet** |
-| Hub → MSP bill-out | What accounting must invoice MSPs | Not systematized; this is the gap |
-| MSP → end customer | What the MSP should charge their customer | Implied by usage + contract + MSP practice; not a clean Hub file |
-
-Closing the month off MSRP alone will be wrong. Closing only off the Coro invoice will also be wrong if usage and billable quantities diverge.
-
-### 3. Quantity / usage noise
-
-Hub expects a **usage report** every month. That file is the missing piece of the operating rhythm — “they send us every month” the invoices, MSRP, agreement copies, and (when it arrives) usage.
-
-We already have **`MSP Hub_August 2026 Usage.xlsx`**. That is the starting usage baseline. Later months still need a dedicated ingest slot so August does not get overwritten and so “no usage file yet” is a visible exception, not a silent zero.
-
-### 4. Document noise
-
-The first packet is typical of how this will keep arriving:
-
-- Two Coro invoices in one cycle: `INVCUS2026-0001914` and `INVCUS2026-0002193`
-- MSRP saved as “Copy of …”
-- The distributor agreement in **both** `.docx` (with comments) and `.pdf`
-- Duplicate or near-duplicate names
-
-SharePoint is the planned **human** aggregation point for “all the files in one place.” That does not solve matching, SKU mapping, or calculating the bill. It only solves finding the files.
-
-### 5. What we were supposed to charge
-
-This is the actual accounting failure mode:
-
-> We know something got invoiced. We do not reliably know whether the SKU, the MSP, the quantity, and the rate match the agreement and the usage.
-
-So the system cannot be “import the Coro invoice and rebill it.” It has to be **reconcile, then bill**:
-
-- Coro invoice lines vs usage
-- usage vs entitled / contracted SKUs
-- Hub bill-out vs both of the above
-- optional check: MSP-to-customer charges vs what the program says they should charge
-
-Anything that does not match becomes an exception for a human. Anything that matches becomes the month’s bill.
+Until that legacy export is in `data/`, treat legacy partner rates as **exceptions**, not guesses.
 
 ---
 
 ## Goal
 
-**Month-end, accounting logs into a simple web app and finishes Coro.**
+**Final goal:** Lindita does not look up H and L by hand. Usage in → rates applied → QuickBooks invoices out. Margin follows. Hub can scale.
 
-Concretely, for a given month (example: August 2026):
+Concretely, for a month (first target: **August 2026**):
 
-1. See which source files were ingested (invoices, MSRP, usage, agreement version).
-2. See Hub’s Coro spend as invoiced, by SKU and by MSP where the invoice supports it.
-3. See usage vs invoice vs proposed Hub bill-out.
-4. Map legacy / current / noise SKUs instead of pretending they are one list.
-5. Produce the MSP invoices (or an export accounting can post) for what Hub should charge.
-6. Flag the rest: missing usage, unknown SKU, rate mismatch, quantity mismatch, MSP with usage and no invoice, invoice with no usage.
+1. Ingest Coro’s **delivered** usage (partner, child customer/workspace, SKU, legacy flag, product, quantities).
+2. Attach **our price (H)** and **what we’re charging (L)** per partner × SKU (current from special pricing; legacy from Jack’s same-format export).
+3. Break the partner bill **down by customer**.
+4. Recreate the August bill and **diff it against Lindita’s manual August file**.
+5. When the diff is acceptable, push the output into **QuickBooks** so Lindita has invoices.
 
-Login is required because this is accounting data, even when Coro cost is still unpublished. Do not build a public site.
+A later **internal web app** (login for Hub accounting, month picker, exceptions) can sit on this loop. Do not let the UI replace Dane’s pipeline. QuickBooks is the invoice system of record he asked for.
 
-**Out of scope for this repo right now:** the app itself, identity provider, SharePoint automation, and any guessed cost sheet. This commit is the problem statement and the `data/` drop zone.
-
----
-
-## Source files (what Coro / the program actually sends)
-
-Planned location: [`data/`](data/README.md).
-
-| File | Month / version | What accounting uses it for |
-| --- | --- | --- |
-| `Copy of 2607-MSRP Pricing.xlsx` | Price list (filename `2607` — treat as a dated catalog, confirm inside the sheet) | Map SKU → list price; detect unknown SKUs; never treat as Hub cost |
-| `Coro_Invoice_INVCUS2026-0001914 (1).xlsx` | Coro invoice `INVCUS2026-0001914` | Money Coro billed Hub; line-level SKUs, quantities, amounts |
-| `Coro_Invoice_INVCUS2026-0002193.xlsx` | Coro invoice `INVCUS2026-0002193` | Same, second invoice. Must not be double-counted or dropped |
-| `MSP Hub - Coro Hybrid Distributor Agreement (2 tier) V2 after cmnts.docx` | Agreement V2, after comments | Billing rights, tiers, definitions, SKU/program rules |
-| Same title `.pdf` | Rendering of the above | Read-only companion for reviewers without Word |
-| `MSP Hub_August 2026 Usage.xlsx` | August 2026 usage | Who used what. The report accounting said we were missing as a monthly habit |
-
-When more invoices, usage extracts, or a cost schedule arrive, they go in `data/` (see the folder README). They do not go in Slack as the system of record.
-
-**SharePoint:** the team will aggregate a lot of this into a SharePoint file. That is fine as a shared drive. The app should still ingest from a canonical `data/` (or an export from SharePoint), not scrape the SharePoint UI.
+**Out of scope until instructed:** selling this back to Coro / AppDirect / other distributors (Luke and Dane noted the play; it is not this build), Coro MCP as a required source (Luke asked; Dane said it should just have the same usage info — still missing H and L), and emailing Lindita’s workbook to partners.
 
 ---
 
-## A practical way to solve it
+## How to build it (Dane’s order)
 
-Do not start with a platform. Start with a **month-end pipeline** that a later UI can sit on.
+This is the method. Do not skip the August proof.
 
-### Phase 0 — this repository (now)
+### 1. Use the files we already have
 
-- Problem, goal, and method written down (this file)
-- Raw monthly packet in `data/`
-- A written SKU and file convention so the next drop does not start from zero
+Dane: we can start without the missing piece; Luke wanted enough structure that new rate files are plug-and-play.
 
-### Phase 1 — normalize, do not bill yet
+Inputs:
 
-Ingest each file type into boring tables. Spreadsheets stay in `data/`; parsed output is separate (database, warehouse, or even versioned CSV — the important part is that parsers are deterministic).
+- Coro **usage** (1st of month; August is in hand)
+- Coro **invoices** to Hub
+- **MSRP**
+- **2-tier hybrid distributor agreement** (5% buffer)
+- **Lindita’s August workbook** — the template to mimic (columns H and L)
+- **Brandon/Jack special pricing** — current SKUs now; **legacy in the same format**, per partner per SKU, their price and our price (Lisa asking Jack/Brandon)
 
-Suggested grains:
+Luke: take the **original** delivered file and Lindita’s file and have the automation **say, based on the original file, this is something that we do** — mimic her output, internally.
+
+### 2. Pair usage with the two prices — the key
+
+For every usage line:
+
+- Partner, customer (child workspace), SKU, legacy vs current, quantity
+- **H = our price** (what Coro bills Hub / Hub cost)
+- **L = what we’re charging** (what Hub bills the MSP)
+
+If a partner has a special deal, use that partner’s row, not a house average. That is why Jack’s export must be **per partner, per SKU**.
+
+Apply the **5% buffer** from the agreement when the special-pricing sheet says to (Dane’s 60% → 65% example). Do not invent a buffer Lisa did not confirm on a given row.
+
+### 3. Recreate August against Lindita
+
+Dane, verbatim on next steps:
+
+> Once we get that information from Jack, we should try to **recreate the August invoice** and see any **discrepancies** we have against **Lita’s manual one**, and we’ll be able to make corrections there.
+
+That is the acceptance test. Not a demo UI. Not a green unit test that never saw August.
+
+When the recreation matches (or every mismatch has an explained exception: legacy $6 vs $9, unknown U/D, partner on “different stuff”), then automate.
+
+### 4. QuickBooks
+
+Dane: *in a perfect world, QuickBooks ingest this and be able to create invoices based off of it.*
+
+Implementation can start with a clean export Lindita can post, then an actual QuickBooks connection. Do not skip the recreation step because the QBO API is more interesting.
+
+### 5. Then month-end, every month
+
+1. Coro drops usage ~1st of month into SharePoint / `data/YYYY-MM/`.
+2. Confirm special pricing (current + legacy tabs) did not change, or ingest Jack’s edits (**dynamic copy**, not a stale download — Dane wanted Jack’s live edits in SharePoint).
+3. Run the pipeline → proposed H/L → QuickBooks invoices.
+4. Lindita reviews exceptions only, not every SKU.
+
+---
+
+## Source files
+
+Location: [`data/`](data/README.md). Originals only. Do not edit in place.
+
+| File | Role |
+| --- | --- |
+| `Call with Luke Barhoumeh (2).docx` | This build brief. Dane / Lisa / Luke, Sep 11, 2026. |
+| `Copy of 2607-MSRP Pricing.xlsx` | List / MSRP. Not Hub cost. |
+| `Coro_Invoice_INVCUS2026-0001914 (1).xlsx` | Coro → Hub invoice `1914` |
+| `Coro_Invoice_INVCUS2026-0002193.xlsx` | Coro → Hub invoice `2193` — do not drop or double-count |
+| `MSP Hub - Coro Hybrid Distributor Agreement (2 tier) V2 after cmnts.docx` (+ `.pdf`) | 2-tier terms, including the **5% buffer**. Dane flagged an *old agreement* in SharePoint that would only confuse the build — use V2 after comments, not a stale copy. |
+| `MSP Hub_August 2026 Usage.xlsx` | August usage for all partners under Hub (the monthly 1st-of-month report) |
+| Lindita’s August billing workbook | **Still needed in `data/` if not already here.** The mimic target (columns H and L). |
+| Brandon/Jack special pricing | **Still needed.** Current SKU net/MSP/Hub prices; legacy in the **same format** (their price + our price, per partner per SKU). |
+
+SharePoint remains where humans drop files. The app/pipeline reads canonical copies from `data/` (or an export). Dane also wanted the **live** special-pricing workbook linked into SharePoint so Jack’s edits are not frozen.
+
+**Coro MCP:** Luke asked if Coro’s MCP would have billing per tenant / per MSP / per customer. Dane: it should just have *this* (usage) information. It still would not give H and L. Nice-to-have later, not the spine.
+
+---
+
+## Data model (so H and L can attach)
+
+Spreadsheets stay in `data/`. Parsed tables are separate and deterministic.
 
 | Entity | Grain | Source |
 | --- | --- | --- |
-| `sku_catalog` | vendor SKU code | MSRP + invoice + usage + agreement notes |
-| `sku_map` | from_code → canonical_code, class = `current` \| `legacy` \| `noise` | Maintained by accounting, not inferred once and forgotten |
-| `coro_invoice_line` | invoice number + line | The two `.xlsx` invoices |
-| `usage_line` | month + MSP + customer/tenant + SKU | Usage workbook |
-| `msp` | Hub MSP account | Usage, invoices, Hub’s own MSP list (when attached) |
-| `end_customer` | MSP’s customer | Usage, if present |
-| `contract_term` | agreement version + effective date | The 2-tier hybrid agreement |
+| `usage_line` | month + partner + child customer/workspace + SKU | Monthly usage (usage tab) |
+| `sku` | vendor SKU + class `current` \| `legacy` \| `noise` | Usage + MSRP + invoices; legacy flag Dane highlighted |
+| `rate_card` | partner + SKU + period | Brandon/Jack special pricing (current and legacy tabs, same format) |
+| `hub_cost` | partner + SKU → column **H** | Special pricing “our price” / what Coro bills Hub (e.g. list minus 45% on legacy, plus 5% buffer when the agreement says so) |
+| `msp_price` | partner + SKU → column **L** | Special pricing “their price” / what Hub charges the MSP |
+| `lindita_august_line` | partner + customer + SKU | Manual August file — **the recreation target** |
+| `coro_invoice_line` | invoice number + line | `1914` and `2193` |
+| `qb_invoice` | MSP + month | Output |
 
-Rules:
+Rules Dane implied:
 
-- Never collapse the two Coro invoices until you have proven they are not overlapping.
-- Never assume MSRP is cost.
-- Never assume usage quantity equals invoice quantity.
-- Unknown SKU is an exception, not a dropped row.
+- Never assume one rate for all partners.
+- Never treat MSRP as our price.
+- Never treat usage quantity as optional — it is the driver.
+- Unknown U/D: leave unknown.
+- Legacy vs current must stay visible; Coro is migrating legacy → AI, but August still has legacy.
+- Two Coro invoices in one cycle stay two invoices until proven otherwise.
 
-### Phase 2 — reconcile
+---
 
-For each month, produce three aligned views at SKU + MSP grain (and customer grain when usage has it):
+## Reconciliation checks
 
-1. **Invoiced by Coro** — from invoice lines
-2. **Used** — from the usage report
-3. **Billable by Hub** — from contract + current SKU map + (later) Hub’s rate card to MSPs
-
-Then compute variances:
+After H and L are applied, before QuickBooks:
 
 | Check | Fail means |
 | --- | --- |
-| Usage SKU not in catalog | SKU map gap |
-| Invoice SKU not in catalog | Coro billed a code we cannot price downstream |
-| Usage quantity ≠ invoice quantity | Consumption vs vendor bill disagreement |
-| Invoice amount ≠ qty × expected rate | Rate or discount problem (expected rate may still be unknown if cost/sell are missing) |
-| Usage with no invoice | Unbilled by Coro, or wrong month |
-| Invoice with no usage | Vendor bill without evidence, or usage file late |
-| Legacy SKU still billed as if current | Mapping / commercial cleanup |
-| Noise SKU on an MSP bill | We would pass garbage to an MSP |
+| Usage row with no H or L | Rate card gap (especially legacy) |
+| Recreation ≠ Lindita August | The bug, or Lindita used a special deal we missed ($6 vs $9) |
+| Partner on a deal not on the rate card | “Partners are on different stuff” |
+| Child workspace not rolled into the parent MSP invoice | We would bill the wrong party |
+| Invoice from Coro vs our H × qty | Cost disagreement with vendor |
+| Legacy priced as current | Mapping error |
 
-Accounting’s job in the app is to **accept, reclass, or hold** each exception. The system does not silently “fix” rates.
-
-### Phase 3 — bill the MSPs
-
-Only after Phase 2 is green (or exceptions are explicitly waived):
-
-- Generate Hub → MSP invoice lines: MSP, SKU (current code), quantity, rate, amount, period
-- Keep the audit: which Coro invoice lines and usage lines justified each Hub line
-- Export: Excel/CSV for the current accounting tool, then (later) post from the app
-
-MSP → end-customer billing stays the MSP’s responsibility. Hub still reports “what they were supposed to charge” as a **compliance / program** view, not as Hub revenue.
-
-### Phase 4 — the accounting web app
-
-A small internal app. One purpose: Coro month-end.
-
-Suggested screens (when we are told to build it):
-
-1. **Sign in** — Hub staff only
-2. **Month** — pick `2026-08`, see file checklist (invoice 1914, invoice 2193, MSRP, usage, agreement version)
-3. **Reconciliation** — invoiced vs used vs billable, with filters for MSP and SKU class
-4. **SKU map** — current / legacy / noise, editable by accounting
-5. **Exceptions** — queue with state (open / waived / corrected)
-6. **Bill run** — proposed MSP invoices, then export or post
-
-No extra products, no extra vendors, no second component library debate until this loop is real.
-
-### Why not “just SharePoint”?
-
-SharePoint can hold the files. It cannot:
-
-- join two invoices to one usage month without double counting
-- remember that a legacy SKU is the same product as a current SKU
-- apply a rate we do not have yet without someone typing it
-- produce a repeatable bill run next month
-
-The app reads the same files SharePoint holds. SharePoint remains the dump. This repo (and later the app) is the **close**.
+Accounting **accepts, reclass, or holds** exceptions. The system does not silently “fix” rates.
 
 ---
 
 ## Operating cadence (month-end)
 
-1. Drop Coro’s packet into `data/YYYY-MM/` (invoices, MSRP if updated, usage).
-2. Confirm agreement version did not change; if it did, store the new V* next to the old one.
-3. Ingest → normalize SKUs → reconcile.
-4. Accounting works the exception queue.
-5. Freeze the bill run.
-6. Export Hub → MSP invoices.
-7. Archive the month; do not reuse August usage as a stand-in for September.
+1. Drop Coro’s packet into `data/YYYY-MM/` (usage on ~the 1st, invoices, MSRP if updated).
+2. Confirm Jack/Brandon pricing (dynamic SharePoint copy).
+3. Run usage → H/L → proposed partner invoices, broken down by customer.
+4. First month: **recreate August vs Lindita** and correct.
+5. Thereafter: Lindita reviews exceptions; QuickBooks gets the invoices.
+6. Do not reuse August usage for September.
 
-If usage is late: **do not bill as if usage were zero.** Mark the month `usage_missing` and wait or bill off a written fallback policy (none is defined here until accounting writes one).
+If usage is late: **do not bill as if usage were zero.** Dane’s whole machine starts from that file.
 
 ---
 
-## Constraints and decisions (so we do not relitigate them)
+## Constraints (do not relitigate)
 
-| Decision | Why |
+| Decision | Source |
 | --- | --- |
-| Accounting-first, not MSP-portal-first | The pain is Hub close, not MSP UX |
-| Cost is a separate input | Coro cost is not disclosed yet; MSRP is not a substitute |
-| Two invoices in one month are first-class | `1914` and `2193` both exist; dropping one is a close error |
-| Usage is required | Called out as the missing monthly report; August 2026 is the first copy |
-| SKU classes are explicit | Current vs legacy vs noise |
-| App comes after files + README | This commit only |
+| Replace Lindita’s manual H/L work | Dane: *this is what I want to replace* |
+| Magic sauce = usage + our cost + what we charge, then QuickBooks | Dane |
+| Recreate August vs Lindita before trusting automation | Dane to Luke |
+| Per partner, per SKU, their price and our price | Dane to Lisa/Jack |
+| Legacy export same format, separate tab | Lisa + Dane |
+| 45% Coro discount on legacy (what they bill Hub) | Lisa |
+| 5% buffer for Hub on top of partner discounts | Dane, from the agreement |
+| Break Hub bills down by customer | Dane (Amplivity example) |
+| Internal workbook; QuickBooks is what the partner gets | Dane + Luke |
+| Start with files on hand; plug rates when Jack delivers | Dane / Luke |
+| Accounting-first, not MSP portal | Whole call |
 
 ---
 
 ## Repository layout
 
 ```text
-README.md          ← you are here
-data/              ← original Coro / program files only
-data/README.md     ← ingest rules and the expected first packet
+README.md          ← spec (this file)
+data/              ← original Coro / Hub files + the call transcript
+data/README.md     ← ingest rules
 ```
 
-When the app is approved, it should live in this same repository unless accounting asks otherwise. Do not stand up a second repo for “the real app.”
+When the app is built, it lives in this repo. Do not start a second repo for “the real app.”
 
 ---
 
 ## How to run this (today)
 
-There is nothing to run. Clone the repo, put originals in `data/`, and treat this README as the spec.
+There is nothing to run yet. Clone, put originals in `data/`, treat this README as the spec.
 
 ```bash
 git clone <this-repo-url>
@@ -298,9 +359,10 @@ ls data
 
 ## What happens next
 
-Luke will add more documents as they arrive (further invoices, later usage, cost once it can be shared). Next build step, when instructed:
+1. Drop any still-missing binaries into `data/` (Lindita August workbook, Jack/Brandon special pricing, the six Coro files if they are not already there).
+2. Parse usage + Lindita’s August layout (find columns H and L).
+3. Recreate August; list discrepancies.
+4. QuickBooks export/connect.
+5. Only then: a small internal web UI for month-end exceptions.
 
-1. Parse the workbooks in `data/` into a SKU inventory and a first August 2026 recon (even if it is a spreadsheet output).
-2. Then the accounting web app for login + month-end workflow.
-
-Until those instructions, do not scaffold the app.
+Until those files are in `data/`, do not scaffold a fake app around guessed rates.
