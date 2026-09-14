@@ -347,22 +347,41 @@ When the app is built, it lives in this repo. Do not start a second repo for “
 
 ## How to run this (today)
 
-There is nothing to run yet. Clone, put originals in `data/`, treat this README as the spec.
+The pipeline is **built and proven end-to-end** — but on **synthetic** fixtures
+(`fixtures/synthetic/`, clearly labeled, *not* real rates), because the real Coro/
+Jack/Lindita files are not in the repo yet. Per-partner **H/L come only from real
+rate-card files**; nothing is hardcoded except the 5% buffer and 45% legacy discount,
+both quoted from the call. It is structured for **plug-and-play**: drop the real files
+in and it prices them — exactly what Luke committed to on the call.
 
 ```bash
-git clone <this-repo-url>
-cd <repo>
-ls data
+pnpm install                 # Node 20+ (22 recommended)
+pnpm test                    # 131 tests, incl. the golden recreate-vs-Lindita test
+pnpm typecheck               # strict TypeScript, clean
+
+# Once the real files land in data/YYYY-MM/ (usage, special pricing, Lindita's workbook):
+npx tsx src/cli/index.ts run       --data data/2026-08 --month 2026-08 --out out/
+npx tsx src/cli/index.ts reconcile --data data/2026-08 --month 2026-08   # the acceptance gate
+npx tsx src/cli/index.ts export    --data data/2026-08 --month 2026-08 --format csv
+# (or `pnpm build` then use the packaged `coro-billing` binary)
 ```
+
+Docs: [`docs/RUNBOOK.md`](docs/RUNBOOK.md) (month-end cadence), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+(module map + contracts), [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md) (expected
+columns + rule→transcript traceability), [`docs/QUICKBOOKS.md`](docs/QUICKBOOKS.md).
 
 ---
 
 ## What happens next
 
-1. Drop any still-missing binaries into `data/` (Lindita August workbook, Jack/Brandon special pricing, the six Coro files if they are not already there).
-2. Parse usage + Lindita’s August layout (find columns H and L).
-3. Recreate August; list discrepancies.
-4. QuickBooks export/connect.
-5. Only then: a small internal web UI for month-end exceptions.
+Status of the build (against the spec above):
 
-Until those files are in `data/`, do not scaffold a fake app around guessed rates.
+1. ✅ Parse usage + rate card (current + legacy tabs) + Lindita’s layout (columns H and L) + MSRP + the two Coro invoices — deterministic, plug-and-play column mapping.
+2. ✅ Attach **H** and **L** per partner × SKU (class-aware, no house average), break the bill down **by customer**, margin follows.
+3. ✅ Recreate the month and diff against Lindita (`reconcile`) — the acceptance gate, proven cent-exact on synthetic fixtures.
+4. ✅ QuickBooks **export** (QBO import CSV + Desktop IIF); a documented QBO-API adapter is scaffolded (stub, not wired).
+5. ⏳ **Drop the real binaries into `data/`** (Lindita’s August workbook, Jack/Brandon special pricing, the Coro usage/invoice/MSRP files) — then re-run `reconcile` for the real August-vs-Lindita tie-out.
+6. ⏳ A small internal web UI for month-end exceptions (sits on top of this pipeline; does not replace it).
+
+Nothing here guesses a rate. Until the real files are in `data/`, the numbers you see
+come only from the clearly-labeled synthetic fixtures — never presented as a real close.

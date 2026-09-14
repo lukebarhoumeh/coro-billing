@@ -120,7 +120,14 @@ export interface RateCardEntry {
  * partners are on different stuff." A miss returns null and becomes an Exception.
  */
 export interface RateCard {
-  lookup(partner: string, sku: string, period: Period): RateCardEntry | null;
+  /**
+   * Look up the rate for a partner+SKU at a period. When `klass` is supplied and the
+   * partner+SKU bucket holds both a current and a legacy row, the class-matching row
+   * is preferred (a legacy usage line prices from the legacy tab), so a legacy line
+   * can never be silently priced from a current row — Dane's "$6 vs $9" landmine.
+   * A miss returns null — NEVER a house/average or cross-partner fallback.
+   */
+  lookup(partner: string, sku: string, period: Period, klass?: SkuClass): RateCardEntry | null;
   readonly entries: readonly RateCardEntry[];
 }
 
