@@ -1,0 +1,17 @@
+# Office lock / temp files
+~$*
+*.tmp
+*.temp
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Local scratch
+.venv/
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.idea/
+.vscode/
