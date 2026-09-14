@@ -23,7 +23,7 @@ These are the documents Luke listed for the current cycle. Binaries belong in th
 | Lindita’s August billing workbook | **Needed.** The mimic target: column H = our price, column L = what we’re charging. Internal only. |
 | Brandon/Jack special pricing | **Needed.** Current SKUs now; legacy in the same format (per partner, per SKU, their price + our price). |
 
-Status of this clone: **catalog only until the binaries are copied in.** If a filename above is missing from `data/`, it did not transfer with the chat attachments and still needs to be dropped in.
+Status of this clone: the **call transcript is in this folder**. The Coro workbooks (usage, invoices, MSRP, agreement) and Lindita/Jack files still need to be dropped in if they are not already here.
 
 ## Naming convention going forward
 
