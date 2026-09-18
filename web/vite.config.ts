@@ -7,12 +7,20 @@ import { fileURLToPath, URL } from "node:url";
 // fixtures from ../fixtures via the aliases below. server.fs.allow lets the dev server
 // read those parent folders.
 export default defineConfig({
+  // Relative base so the same build works on GitHub Pages (/coro-billing/),
+  // jsDelivr, Netlify, and local preview without a host-specific prefix.
+  base: "./",
   plugins: [react()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@pipeline": fileURLToPath(new URL("../src", import.meta.url)),
       "@fixtures": fileURLToPath(new URL("../fixtures", import.meta.url)),
+      // Parent folders (../src, ../fixtures) resolve packages from the repo root.
+      // Pin shared deps to this app's node_modules so `vite build` works without
+      // a root install (GitHub Pages CI only installs web/).
+      xlsx: fileURLToPath(new URL("./node_modules/xlsx", import.meta.url)),
+      "decimal.js": fileURLToPath(new URL("./node_modules/decimal.js", import.meta.url)),
     },
   },
   server: {
