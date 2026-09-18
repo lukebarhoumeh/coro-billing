@@ -354,10 +354,21 @@ rate-card files**; nothing is hardcoded except the 5% buffer and 45% legacy disc
 both quoted from the call. It is structured for **plug-and-play**: drop the real files
 in and it prices them — exactly what Luke committed to on the call.
 
+**Live demo (synthetic data only):** https://lukebarhoumeh.github.io/coro-billing/
+
+That is the internal Hub-accounting dashboard: Overview, Invoices, Reconcile, and
+Exceptions. It runs the real pipeline in the browser over loudly-labeled synthetic
+fixtures — never a real Coro close. Switch **Clean month** vs **Month with issues**
+to show the August-vs-Lindita tie-out and the $6-vs-$9 / missing-rate exceptions.
+
 ```bash
 pnpm install                 # Node 20+ (22 recommended)
 pnpm test                    # 131 tests, incl. the golden recreate-vs-Lindita test
 pnpm typecheck               # strict TypeScript, clean
+
+# Local dashboard (same UI as the live demo):
+pnpm --dir web install
+pnpm --dir web dev           # http://localhost:5173
 
 # Once the real files land in data/YYYY-MM/ (usage, special pricing, Lindita's workbook):
 npx tsx src/cli/index.ts run       --data data/2026-08 --month 2026-08 --out out/
