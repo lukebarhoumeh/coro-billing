@@ -361,6 +361,10 @@ Exceptions. It runs the real pipeline in the browser over loudly-labeled synthet
 fixtures — never a real Coro close. Switch **Clean month** vs **Month with issues**
 to show the August-vs-Lindita tie-out and the $6-vs-$9 / missing-rate exceptions.
 
+GitHub Pages is published from the `gh-pages` branch. If that URL 404s, enable it
+once under **Settings → Pages**: Source **Deploy from a branch**, branch
+`gh-pages`, folder `/ (root)`. After that, pushes to `main` refresh the demo.
+
 ```bash
 pnpm install                 # Node 20+ (22 recommended)
 pnpm test                    # 131 tests, incl. the golden recreate-vs-Lindita test

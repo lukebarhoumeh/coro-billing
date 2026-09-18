@@ -33,8 +33,6 @@ jobs:
 
       - name: Build
         working-directory: web
-        env:
-          BASE_PATH: /coro-billing/
         run: pnpm build
 
       - name: Publish to GitHub Pages

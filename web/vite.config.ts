@@ -7,8 +7,9 @@ import { fileURLToPath, URL } from "node:url";
 // fixtures from ../fixtures via the aliases below. server.fs.allow lets the dev server
 // read those parent folders.
 export default defineConfig({
-  // GitHub Pages serves the site at /<repo>/; local/dev and most hosts use "/".
-  base: process.env.BASE_PATH || "/",
+  // Relative base so the same build works on GitHub Pages (/coro-billing/),
+  // jsDelivr, Netlify, and local preview without a host-specific prefix.
+  base: "./",
   plugins: [react()],
   resolve: {
     alias: {
