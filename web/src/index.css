@@ -2,27 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------------- *
+ * MIDNIGHT LEDGER — the workbench's design system.
+ *
+ * A private-bank/terminal aesthetic for a finance close tool: deep blue-black
+ * ink ground with a faint paper grain, hairline rules, BRASS as the money
+ * accent (primary), viridian for positive margin, warm amber for review,
+ * crimson for blocks. Fraunces (serif, optical sizing) carries headings and
+ * the large KPI numerals; IBM Plex Sans carries UI and dense tabular data.
+ * ------------------------------------------------------------------------- */
 :root {
-  --radius: 0.65rem;
-  --background: 222 24% 8%;
-  --foreground: 210 20% 96%;
-  --card: 222 22% 11%;
-  --card-foreground: 210 20% 96%;
-  --muted: 220 16% 18%;
-  --muted-foreground: 215 16% 62%;
-  --border: 220 16% 20%;
-  --input: 220 16% 20%;
-  --ring: 199 89% 55%;
-  --primary: 199 89% 52%;
-  --primary-foreground: 222 47% 8%;
-  --accent: 262 83% 66%;
-  --accent-foreground: 210 20% 98%;
-  --success: 152 62% 44%;
-  --success-foreground: 152 40% 96%;
-  --warning: 38 92% 55%;
-  --warning-foreground: 38 60% 10%;
-  --danger: 0 72% 58%;
-  --danger-foreground: 0 40% 98%;
+  --radius: 0.6rem;
+
+  /* Ink ground + surfaces */
+  --background: 225 32% 6%;
+  --foreground: 40 24% 94%;
+  --card: 224 28% 9%;
+  --card-foreground: 40 24% 94%;
+  --muted: 224 20% 15%;
+  --muted-foreground: 222 12% 64%;
+  --border: 224 18% 17%;
+  --input: 224 18% 17%;
+
+  /* Brass — the money accent (primary actions, KPI highlights) */
+  --brass: 41 62% 60%;
+  --primary: 41 62% 60%;
+  --primary-foreground: 228 40% 8%;
+  --ring: 41 62% 60%;
+
+  /* Viridian — positive margin / success */
+  --success: 165 55% 44%;
+  --success-foreground: 165 45% 94%;
+
+  /* Ink-blue secondary accent (informational) */
+  --accent: 210 65% 62%;
+  --accent-foreground: 210 40% 97%;
+
+  /* Review amber + block crimson */
+  --warning: 30 92% 56%;
+  --warning-foreground: 30 70% 8%;
+  --danger: 356 68% 56%;
+  --danger-foreground: 356 40% 97%;
 }
 
 * {
@@ -38,14 +58,83 @@ body,
 body {
   margin: 0;
   background-color: hsl(var(--background));
+  /* Faint radial lamp glow over the ledger — atmosphere without noise. */
+  background-image:
+    radial-gradient(1200px 600px at 18% -10%, hsl(41 62% 60% / 0.05), transparent 60%),
+    radial-gradient(900px 500px at 90% 110%, hsl(210 65% 62% / 0.04), transparent 55%);
+  background-attachment: fixed;
   color: hsl(var(--foreground));
-  font-feature-settings: "cv11", "ss01";
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Paper grain over everything (pointer-transparent, extremely subtle). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* Numeric alignment for money columns. */
 .tabular {
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Uppercase letterspaced microlabels — the ledger's caption idiom. */
+.microlabel {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Large ledger numerals (KPIs, invoice totals). */
+.figure {
+  font-family: "Fraunces", Georgia, serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+/* Faint ruled-paper texture for header zones. */
+.ledger-lines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 27px,
+    hsl(var(--border) / 0.5) 27px,
+    hsl(var(--border) / 0.5) 28px
+  );
+}
+
+/* Staggered entrance — set --rise-i per element; respects reduced motion. */
+.rise {
+  animation: rise-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--rise-i, 0) * 55ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}
+
+/* Brass hairline under section headings. */
+.rule-brass {
+  position: relative;
+}
+.rule-brass::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 2.25rem;
+  height: 2px;
+  background: linear-gradient(90deg, hsl(var(--brass)), hsl(var(--brass) / 0));
 }
 
 /* ------------------------------------------------------------------------- *
@@ -57,6 +146,9 @@ body {
  * of this — they are display-based and are NOT redefined here.
  * ------------------------------------------------------------------------- */
 @media print {
+  body::before {
+    display: none;
+  }
   body * {
     visibility: hidden;
   }

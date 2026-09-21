@@ -1,9 +1,10 @@
 /**
- * Overview — the month at a glance.
+ * Overview — the month at a glance ("Midnight Ledger").
  *
- * KPI row (billed / cost / margin / partners / findings), margin-by-partner
+ * KPI row (billed / cost / gross profit / partners / findings), GP-by-partner
  * bars that jump into the per-MSP draft, the two-cost-rules callout (sheet
  * ×0.95 vs Coro's additive discount stacking), and a held-lines warning.
+ * GP = the model's Money margin; GM% always via gmPct() — never local math.
  * All figures come straight off the CloseModel; HELD lines are excluded from
  * every total and surfaced separately — never rendered as zero-dollar rows.
  */
@@ -22,7 +23,7 @@ import { Money, sum } from "@pipeline/lib/money.js";
 import type { CloseModel, PartnerDraft } from "@pipeline/domain/types.js";
 import { useClose } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
-import { money, pct } from "@/lib/format";
+import { money, gmPct } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, severityVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,6 @@ interface Aggregates {
   readonly costExpected: Money;
   readonly costActual: Money | null;
   readonly margin: Money;
-  readonly marginFraction: number | undefined;
   readonly severityCounts: Readonly<Record<(typeof SEVERITIES)[number], number>>;
   readonly byBilled: readonly PartnerDraft[];
   readonly maxBilledCents: number;
@@ -54,7 +54,6 @@ function aggregate(model: CloseModel): Aggregates {
     .filter((h): h is Money => h !== null);
   const costActual = actuals.length > 0 ? sum(actuals) : null;
   const margin = sum(model.partners.map((p) => p.totalMargin));
-  const marginFraction = billed.isZero() ? undefined : margin.toNumber() / billed.toNumber();
 
   const severityCounts = { block: 0, warn: 0, info: 0 };
   for (const f of model.findings) severityCounts[f.severity] += 1;
@@ -85,7 +84,6 @@ function aggregate(model: CloseModel): Aggregates {
     costExpected,
     costActual,
     margin,
-    marginFraction,
     severityCounts,
     byBilled,
     maxBilledCents,
@@ -114,7 +112,7 @@ function Kpi({
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-1">{children}</CardContent>
+      <CardContent className="space-y-1.5">{children}</CardContent>
     </Card>
   );
 }
@@ -128,18 +126,21 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Overview</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+        <h1 className="figure rule-brass text-2xl">Overview</h1>
+        <p className="pt-1 text-sm text-muted-foreground">
           {period} at a glance — every figure below traces to the draft invoices; held lines are
           excluded from totals, never zeroed.
         </p>
       </div>
 
       {/* KPI row */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div
+        className="rise grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
+        style={{ "--rise-i": 1 } as React.CSSProperties}
+      >
         <Kpi icon={Wallet} title="Billed to partners">
-          <div className="text-2xl font-semibold tabular">{money(a.billed)}</div>
+          <div className="figure tabular text-3xl">{money(a.billed)}</div>
           <div className="text-xs text-muted-foreground">
             sum of {model.partners.length} draft invoices
           </div>
@@ -148,7 +149,7 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
         <Kpi icon={Receipt} title="Our cost">
           {a.costActual !== null ? (
             <>
-              <div className="text-2xl font-semibold tabular">{money(a.costActual)}</div>
+              <div className="figure tabular text-3xl">{money(a.costActual)}</div>
               <div className="text-xs text-muted-foreground">actual (Coro invoice)</div>
               <div className="text-xs text-muted-foreground">
                 expected <span className="tabular">{money(a.costExpected)}</span> (additive rule)
@@ -156,35 +157,43 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
             </>
           ) : (
             <>
-              <div className="text-2xl font-semibold tabular">{money(a.costExpected)}</div>
+              <div className="figure tabular text-3xl">{money(a.costExpected)}</div>
               <div className="text-xs text-muted-foreground">expected (additive rule)</div>
             </>
           )}
         </Kpi>
 
-        <Kpi icon={marginNegative ? TrendingDown : TrendingUp} title="Margin">
+        <Kpi icon={marginNegative ? TrendingDown : TrendingUp} title="Gross profit (GP)">
           <div
             className={cn(
-              "text-2xl font-semibold tabular",
+              "figure tabular text-3xl",
               marginNegative ? "text-danger" : "text-success"
             )}
           >
             {money(a.margin)}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {pct(a.marginFraction)} of billed
+          <div className="flex items-baseline gap-1.5">
+            <span
+              className={cn(
+                "figure tabular text-lg",
+                marginNegative ? "text-danger" : "text-success"
+              )}
+            >
+              GM {gmPct(a.margin, a.billed)}
+            </span>
+            <span className="microlabel">of billed</span>
           </div>
         </Kpi>
 
         <Kpi icon={Users} title="Partners">
-          <div className="text-2xl font-semibold tabular">{model.partners.length}</div>
+          <div className="figure tabular text-3xl">{model.partners.length}</div>
           <div className="text-xs text-muted-foreground">
             {model.partners.length} drafts · {model.cardOnly.length} quiet on card
           </div>
         </Kpi>
 
         <Kpi icon={TriangleAlert} title="Findings">
-          <div className="text-2xl font-semibold tabular">{totalFindings}</div>
+          <div className="figure tabular text-3xl">{totalFindings}</div>
           {totalFindings > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {SEVERITIES.filter((s) => a.severityCounts[s] > 0).map((s) => (
@@ -201,18 +210,23 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
 
       {/* Held lines — loud, amber, above the fold. */}
       {a.heldTotal > 0 && (
-        <Card className="border-warning/40 bg-warning/5">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
-            <div className="flex items-start gap-3 text-sm">
-              <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+        <Card
+          className="rise border-warning/40 bg-warning/5"
+          style={{ "--rise-i": 2 } as React.CSSProperties}
+        >
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+            <div className="flex items-start gap-3">
+              <CircleAlert className="mt-1 h-5 w-5 shrink-0 text-warning" />
               <div>
-                <div className="font-medium text-warning">
-                  {a.heldTotal} line{a.heldTotal === 1 ? "" : "s"} held — excluded from every total
-                  above
+                <div className="microlabel">Held — excluded from every total above</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="figure tabular text-2xl text-warning">{a.heldTotal}</span>
+                  <span className="text-sm text-foreground">
+                    line{a.heldTotal === 1 ? "" : "s"} with no confirmed Net Price to MSP
+                  </span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  No confirmed Net Price to MSP (missing rate or unknown product):{" "}
-                  {a.heldPartners.map((p) => p.cardName).join(", ")}
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  Missing rate or unknown product: {a.heldPartners.map((p) => p.cardName).join(", ")}
                 </div>
               </div>
             </div>
@@ -227,16 +241,17 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
         </Card>
       )}
 
-      {/* Margin by partner */}
-      <Card>
+      {/* GP by partner */}
+      <Card className="rise" style={{ "--rise-i": 3 } as React.CSSProperties}>
         <CardHeader>
-          <CardTitle>Margin by partner</CardTitle>
+          <CardTitle>GP by partner</CardTitle>
         </CardHeader>
         <CardContent className="pt-2">
           <div className="divide-y divide-border/60">
             {a.byBilled.map((p) => {
               const widthPct =
                 a.maxBilledCents > 0 ? (p.totalL.toCents() / a.maxBilledCents) * 100 : 0;
+              const gpNegative = p.totalMargin.isNegative();
               return (
                 <button
                   key={p.slug}
@@ -248,7 +263,7 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
                   <span className="w-44 shrink-0 truncate font-medium">{p.cardName}</span>
                   <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted/60">
                     <span
-                      className="block h-full rounded-full bg-primary/60"
+                      className="block h-full rounded-full bg-gradient-to-r from-primary/70 to-primary/30"
                       style={{ width: `${widthPct}%` }}
                     />
                   </span>
@@ -256,53 +271,53 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
                   <span
                     className={cn(
                       "w-28 shrink-0 text-right tabular",
-                      p.totalMargin.isNegative() ? "text-danger" : "text-muted-foreground"
+                      gpNegative ? "text-danger" : "text-success"
                     )}
                   >
                     {money(p.totalMargin)}
+                  </span>
+                  <span className="w-16 shrink-0 text-right">
+                    <Badge variant={gpNegative ? "danger" : "success"} className="tabular">
+                      {gmPct(p.totalMargin, p.totalL)}
+                    </Badge>
                   </span>
                 </button>
               );
             })}
           </div>
-          <div className="mt-2 flex justify-end gap-3 px-1 text-xs uppercase tracking-wide text-muted-foreground">
-            <span className="w-28 text-right">billed</span>
-            <span className="w-28 text-right">margin</span>
+          <div className="mt-2 flex justify-end gap-3 px-1">
+            <span className="microlabel w-28 text-right">billed</span>
+            <span className="microlabel w-28 text-right">GP</span>
+            <span className="microlabel w-16 text-right">GM</span>
           </div>
         </CardContent>
       </Card>
 
       {/* Two cost rules */}
-      <Card>
+      <Card className="rise" style={{ "--rise-i": 4 } as React.CSSProperties}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Scale className="h-4 w-4 shrink-0 text-primary" />
             Two cost rules — sheet vs Coro's additive billing
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 pt-2">
+        <CardContent className="space-y-4 pt-2">
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Sheet rule (col H)
-              </div>
-              <div className="text-lg font-semibold tabular">{money(a.sheetTotal)}</div>
+              <div className="microlabel">Sheet rule (col H)</div>
+              <div className="figure tabular mt-1 text-2xl">{money(a.sheetTotal)}</div>
               <div className="text-xs text-muted-foreground">MSP price × 0.95</div>
             </div>
             <div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Additive rule
-              </div>
-              <div className="text-lg font-semibold tabular">{money(a.additiveTotal)}</div>
+              <div className="microlabel">Additive rule</div>
+              <div className="figure tabular mt-1 text-2xl">{money(a.additiveTotal)}</div>
               <div className="text-xs text-muted-foreground">list × (1 − total discount)</div>
             </div>
             <div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Delta (sheet − additive)
-              </div>
+              <div className="microlabel">Delta (sheet − additive)</div>
               <div
                 className={cn(
-                  "text-lg font-semibold tabular",
+                  "figure tabular mt-1 text-2xl",
                   a.rulesDelta.isZero() ? "text-muted-foreground" : "text-warning"
                 )}
               >

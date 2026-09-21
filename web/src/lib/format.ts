@@ -25,3 +25,13 @@ export function pct(fraction: number | undefined): string {
   if (fraction == null) return "—";
   return `${Math.round(fraction * 1000) / 10}%`;
 }
+
+/**
+ * Gross margin percent for MSP Hub: GM = GP ÷ revenue (billed L).
+ * GP is the Money margin the close computed; revenue is the billed amount.
+ * "—" when either is missing or revenue is zero (held/NFR-only drafts).
+ */
+export function gmPct(gp: Money | null, revenue: Money | null): string {
+  if (gp === null || revenue === null || revenue.isZero()) return "—";
+  return pct(gp.toNumber() / revenue.toNumber());
+}

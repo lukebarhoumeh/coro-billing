@@ -10,7 +10,15 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 }
 
 export function THead({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("text-xs uppercase tracking-wide text-muted-foreground", className)} {...props} />;
+  return (
+    <thead
+      className={cn(
+        "text-[0.6875rem] uppercase tracking-[0.12em] text-muted-foreground [&_th]:border-b [&_th]:border-border",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 export function TBody(props: HTMLAttributes<HTMLTableSectionElement>) {

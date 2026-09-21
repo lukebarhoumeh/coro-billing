@@ -51,6 +51,17 @@ export interface ReviewEntry {
 }
 export type ReviewState = Readonly<Record<string, ReviewEntry>>;
 
+/**
+ * A month packet bundled with the deployment (web/public/packet/manifest.json).
+ * Absent by default — the button only lights up when someone has deliberately
+ * placed the files there. `invoice` is optional.
+ */
+export interface PacketManifest {
+  readonly period: Period;
+  readonly label: string;
+  readonly files: Partial<Readonly<Record<SlotKey, string>>>;
+}
+
 export interface CloseStore {
   readonly files: Partial<Readonly<Record<SlotKey, LoadedSlot>>>;
   readonly demo: boolean;
@@ -59,9 +70,13 @@ export interface CloseStore {
   readonly review: ReviewState;
   /** Last per-slot error message (cleared on a successful drop). */
   readonly errors: Partial<Readonly<Record<SlotKey, string>>>;
+  /** Bundled month packet, when the deployment carries one. */
+  readonly packet: PacketManifest | null;
+  readonly packetLoading: boolean;
   ingestFile(slot: SlotKey, file: File): Promise<void>;
   clearSlot(slot: SlotKey): void;
   loadDemo(): void;
+  loadPacket(): Promise<void>;
   setReview(slug: string, entry: ReviewEntry | null): void;
 }
 
@@ -92,6 +107,26 @@ export function CloseProvider({ children }: { children: ReactNode }) {
   const [demo, setDemo] = useState(false);
   const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
   const [review, setReviewState] = useState<ReviewState>({});
+  const [packet, setPacket] = useState<PacketManifest | null>(null);
+  const [packetLoading, setPacketLoading] = useState(false);
+
+  // Discover a bundled month packet, if this deployment carries one.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/packet/manifest.json", { cache: "no-store" });
+        if (!res.ok) return;
+        const m = (await res.json()) as PacketManifest;
+        if (!cancelled && m && typeof m.period === "string" && m.files) setPacket(m);
+      } catch {
+        // No packet — the normal case.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const model = useMemo<CloseModel | null>(() => {
     const pricing = files.pricing?.payload;
@@ -196,9 +231,47 @@ export function CloseProvider({ children }: { children: ReactNode }) {
     [storageKey]
   );
 
+  /** Load the deployment's bundled month packet through the SAME parse path as drops. */
+  const loadPacket = useCallback(async () => {
+    if (packet === null || packetLoading) return;
+    setPacketLoading(true);
+    try {
+      const next: Partial<Record<SlotKey, LoadedSlot>> = {};
+      for (const slot of ["pricing", "usage", "invoice"] as const) {
+        const url = packet.files[slot];
+        if (url === undefined) continue;
+        const res = await fetch(url);
+        if (!res.ok) {
+          setErrors((e) => ({ ...e, [slot]: `packet file missing: ${url} (${res.status})` }));
+          continue;
+        }
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        const fileName = decodeURIComponent(url.split("/").pop() ?? url);
+        const parsed = parseSlotBytes(slot, fileName, bytes, packet.period);
+        if (!isOk(parsed)) {
+          setErrors((e) => ({ ...e, [slot]: parsed.error }));
+          continue;
+        }
+        next[slot] = { fileName, fingerprint: await fingerprintBytes(bytes), ...parsed.value };
+      }
+      if (next.pricing && next.usage) {
+        setFiles(next);
+        setErrors({});
+        setPeriod(packet.period);
+        setDemo(false);
+      }
+    } finally {
+      setPacketLoading(false);
+    }
+  }, [packet, packetLoading]);
+
   const store = useMemo<CloseStore>(
-    () => ({ files, demo, period, model, review, errors, ingestFile, clearSlot, loadDemo, setReview }),
-    [files, demo, period, model, review, errors, ingestFile, clearSlot, loadDemo, setReview]
+    () => ({
+      files, demo, period, model, review, errors, packet, packetLoading,
+      ingestFile, clearSlot, loadDemo, loadPacket, setReview,
+    }),
+    [files, demo, period, model, review, errors, packet, packetLoading,
+      ingestFile, clearSlot, loadDemo, loadPacket, setReview]
   );
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

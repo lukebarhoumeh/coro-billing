@@ -41,7 +41,9 @@ function ProductRow({ line }: { line: DraftLine }) {
   const matchLabel = MATCH_LABEL[line.matchKind];
   return (
     <TR className={cn(held && "bg-warning/5")}>
-      <TD className="whitespace-nowrap text-xs text-muted-foreground">{line.vendorSku}</TD>
+      <TD className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+        {line.vendorSku}
+      </TD>
       <TD>
         <div className={cn(held && "text-warning")}>{line.productLabel}</div>
         {heldReason !== undefined && (
@@ -90,66 +92,70 @@ export function ReconcileScreen({ context }: ScreenProps) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Reconcile</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+        <h1 className="figure rule-brass text-2xl">Reconcile</h1>
+        <p className="pt-1 text-sm text-muted-foreground">
           Three-way match: rate card ↔ usage ↔ Coro invoice. Every workspace lands in exactly one
           bucket below.
         </p>
       </div>
 
-      {/* Summary strip */}
+      {/* Summary strip — four microlabel + figure stat tiles */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="rise" style={{ "--rise-i": 1 } as React.CSSProperties}>
           <CardHeader className="pb-1">
             <CardTitle>Joined partners</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="tabular text-2xl font-semibold">{model.partners.length}</div>
-            <div className="text-xs text-muted-foreground">card + usage matched</div>
+            <div className="figure text-3xl text-foreground">{model.partners.length}</div>
+            <div className="mt-1 text-xs text-muted-foreground">card + usage matched</div>
           </CardContent>
         </Card>
-        <Card className={cn(model.usageOnly.length > 0 && "border-warning/40")}>
+        <Card
+          className={cn("rise", model.usageOnly.length > 0 && "border-warning/40")}
+          style={{ "--rise-i": 2 } as React.CSSProperties}
+        >
           <CardHeader className="pb-1">
             <CardTitle>Usage only</CardTitle>
           </CardHeader>
           <CardContent>
             <div
               className={cn(
-                "tabular text-2xl font-semibold",
-                model.usageOnly.length > 0 && "text-warning"
+                "figure text-3xl",
+                model.usageOnly.length > 0 ? "text-warning" : "text-foreground"
               )}
             >
               {model.usageOnly.length}
             </div>
-            <div className="text-xs text-muted-foreground">no special-pricing block</div>
+            <div className="mt-1 text-xs text-muted-foreground">no special-pricing block</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rise" style={{ "--rise-i": 3 } as React.CSSProperties}>
           <CardHeader className="pb-1">
             <CardTitle>Card only</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="tabular text-2xl font-semibold">{model.cardOnly.length}</div>
-            <div className="text-xs text-muted-foreground">no usage this month</div>
+            <div className="figure text-3xl text-foreground">{model.cardOnly.length}</div>
+            <div className="mt-1 text-xs text-muted-foreground">no usage this month</div>
           </CardContent>
         </Card>
-        <Card className={cn(invoiceLoaded && "border-success/40")}>
+        <Card
+          className={cn("rise", invoiceLoaded && "border-success/40")}
+          style={{ "--rise-i": 4 } as React.CSSProperties}
+        >
           <CardHeader className="pb-1">
             <CardTitle>Coro invoice</CardTitle>
           </CardHeader>
           <CardContent>
-            {invoiceLoaded ? (
-              <div className="flex items-center gap-2 text-success">
-                <Receipt className="h-5 w-5 shrink-0" />
-                <span className="font-semibold">Loaded</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Receipt className="h-5 w-5 shrink-0" />
-                <span className="font-semibold">Not loaded</span>
-              </div>
-            )}
+            <div
+              className={cn(
+                "flex items-center gap-2",
+                invoiceLoaded ? "text-success" : "text-muted-foreground"
+              )}
+            >
+              <Receipt className="h-5 w-5 shrink-0" />
+              <span className="figure text-2xl">{invoiceLoaded ? "Loaded" : "Not loaded"}</span>
+            </div>
             <div className="mt-1 text-xs text-muted-foreground">
               {invoiceLoaded
                 ? "actual Coro cost is authoritative"
@@ -160,7 +166,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
       </div>
 
       {/* Main three-way table */}
-      <Card>
+      <Card className="rise" style={{ "--rise-i": 5 } as React.CSSProperties}>
         <CardHeader className="pb-2">
           <CardTitle>Joined partners — quantity match</CardTitle>
         </CardHeader>
@@ -206,7 +212,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
                           </div>
                         )}
                       </TD>
-                      <TD className="text-xs text-muted-foreground">{p.slug}</TD>
+                      <TD className="font-mono text-xs text-muted-foreground">{p.slug}</TD>
                       <TD>
                         <Check className="h-4 w-4 text-success" />
                       </TD>
@@ -255,7 +261,10 @@ export function ReconcileScreen({ context }: ScreenProps) {
 
       {/* Usage with no pricing block — these lines are in NO draft. */}
       {model.usageOnly.length > 0 && (
-        <Card className="border-warning/40">
+        <Card
+          className="rise border-warning/40"
+          style={{ "--rise-i": 6 } as React.CSSProperties}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-warning">
               <TriangleAlert className="h-4 w-4 shrink-0" />
@@ -271,7 +280,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
               {model.usageOnly.map((u) => (
                 <li key={u.slug} className="flex flex-wrap items-baseline gap-2 text-sm">
                   <span className="font-medium">{u.partner}</span>
-                  <span className="text-xs text-muted-foreground">{u.slug}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{u.slug}</span>
                 </li>
               ))}
             </ul>
@@ -281,7 +290,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
 
       {/* Card partners with no usage — quiet, not missing. */}
       {model.cardOnly.length > 0 && (
-        <Card>
+        <Card className="rise" style={{ "--rise-i": 7 } as React.CSSProperties}>
           <CardHeader className="pb-2">
             <CardTitle>On the card, quiet this month</CardTitle>
           </CardHeader>

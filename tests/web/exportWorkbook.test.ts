@@ -58,9 +58,13 @@ describe("buildCloseWorkbook", () => {
     const acme = rows.find((r) => r["Partner"] === "Acme MSP")!;
     expect(acme["Status"]).toBe("approved");
     expect(acme["Billed L"]).toBeCloseTo(588, 2); // 60×9.00 + 12×4.00
+    // GP/GM tracked explicitly for MSP Hub (Luke, 2026-09-21).
+    expect(acme["GP (margin)"]).toBeCloseTo(60, 2); // 45.00 actual-basis + 15.00 expected-basis
+    expect(acme["GM %"]).toBeCloseTo(10.2, 1); // 60 / 588
     const initech = rows.find((r) => r["Partner"] === "Initech IT")!;
     expect(initech["Held lines"]).toBe(1);
     expect(initech["Status"]).toBe("unreviewed");
+    expect(initech["GM %"]).toBeNull(); // zero billed — no GM
   });
 
   it("partner tabs include customer breakdown rows and a TOTAL row", () => {

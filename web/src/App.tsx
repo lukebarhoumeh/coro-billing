@@ -1,5 +1,5 @@
 /**
- * MSP Hub — Coro Billing workbench shell.
+ * MSP Hub — Coro Billing workbench shell ("Midnight Ledger" design system).
  *
  * Six screens over one CloseModel: Intake (drop the month's files) → Overview →
  * Rate Cards → Reconcile → Invoices (the payoff: per-MSP drafts the account
@@ -44,6 +44,15 @@ const SECTIONS: readonly Section[] = [
   { key: "exceptions", label: "Exceptions", icon: TriangleAlert, Screen: ExceptionsScreen, needsModel: true },
 ];
 
+/** Brass ledger mark — the workbench's brand glyph. */
+function Mark() {
+  return (
+    <div className="flex h-9 w-9 items-center justify-center rounded-md border border-primary/40 bg-primary/10">
+      <span className="figure text-base leading-none text-primary">Ⅼ</span>
+    </div>
+  );
+}
+
 function FileChip({ label, loaded }: { label: string; loaded: string | undefined }) {
   return (
     <span
@@ -84,7 +93,7 @@ export default function App() {
   const ActiveScreen = active.Screen;
 
   return (
-    <div className="flex min-h-full flex-col bg-background text-foreground">
+    <div className="flex min-h-full flex-col bg-transparent text-foreground">
       {store.demo && (
         <div className="flex items-center justify-center gap-2 bg-warning px-4 py-1.5 text-center text-xs font-semibold text-warning-foreground">
           <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
@@ -94,10 +103,15 @@ export default function App() {
 
       <div className="flex flex-1 flex-col lg:flex-row">
         {/* Left rail */}
-        <aside className="shrink-0 border-b border-border bg-card/40 lg:w-60 lg:border-b-0 lg:border-r">
-          <div className="px-5 pb-2 pt-5">
-            <div className="text-sm font-semibold tracking-tight">MSP Hub · Coro Billing</div>
-            <div className="text-xs text-muted-foreground">rate-card close workbench</div>
+        <aside className="shrink-0 border-b border-border bg-card/60 backdrop-blur lg:w-64 lg:border-b-0 lg:border-r">
+          <div className="flex items-center gap-3 px-5 pb-4 pt-6">
+            <Mark />
+            <div>
+              <div className="font-display text-[15px] font-semibold tracking-tight">
+                MSP Hub <span className="text-primary">·</span> Coro Billing
+              </div>
+              <div className="microlabel mt-0.5">Close workbench</div>
+            </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto p-3 lg:flex-col">
             {SECTIONS.map((s) => {
@@ -115,9 +129,9 @@ export default function App() {
                   disabled={disabled}
                   onClick={() => onNavigate(s.key)}
                   className={cn(
-                    "flex items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors",
+                    "flex items-center gap-2.5 whitespace-nowrap rounded-md border-l-2 border-transparent px-3 py-2 text-sm transition-colors",
                     section === s.key
-                      ? "bg-primary/15 font-medium text-primary"
+                      ? "border-primary bg-primary/10 font-medium text-primary"
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                     disabled && "opacity-40"
                   )}
@@ -125,7 +139,12 @@ export default function App() {
                   <s.icon className="h-4 w-4 shrink-0" />
                   {s.label}
                   {count > 0 && (
-                    <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-xs tabular">
+                    <span
+                      className={cn(
+                        "tabular ml-auto rounded-full px-1.5 py-0.5 text-xs",
+                        section === s.key ? "bg-primary/20" : "bg-muted"
+                      )}
+                    >
                       {count}
                     </span>
                   )}
@@ -137,10 +156,10 @@ export default function App() {
 
         {/* Main column */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
-            <div className="text-sm">
-              <span className="font-medium">{store.period}</span>
-              <span className="text-muted-foreground"> close</span>
+          <header className="ledger-lines flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3.5">
+            <div className="flex items-baseline gap-2">
+              <span className="figure text-lg text-foreground">{store.period}</span>
+              <span className="microlabel">close</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <FileChip label="pricing" loaded={store.files.pricing?.fileName} />
@@ -149,20 +168,23 @@ export default function App() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 overflow-auto p-6 lg:p-8">
             {active.needsModel && store.model === null ? (
-              <div className="mx-auto mt-16 max-w-md text-center text-sm text-muted-foreground">
-                <p className="mb-3">Drop the month's files first — the close builds itself.</p>
-                <button className="text-primary underline" onClick={() => onNavigate("intake")}>
+              <div className="mx-auto mt-20 max-w-md text-center">
+                <p className="figure mb-2 text-xl text-foreground">Nothing on the ledger yet</p>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Drop the month's files first — the close builds itself.
+                </p>
+                <button className="text-sm text-primary underline underline-offset-4" onClick={() => onNavigate("intake")}>
                   Go to intake
                 </button>
               </div>
             ) : (
-              <ActiveScreen onNavigate={onNavigate} context={context} />
+              <ActiveScreen key={active.key} onNavigate={onNavigate} context={context} />
             )}
           </main>
 
-          <footer className="border-t border-border px-6 py-2 text-xs text-muted-foreground">
+          <footer className="border-t border-border px-6 py-2 text-xs text-muted-foreground/80">
             All parsing and pricing runs in your browser — files never leave this machine. Every
             number traces to a source row or a written Coro rate; anything unpriceable is HELD, never
             invented.

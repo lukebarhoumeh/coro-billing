@@ -24,8 +24,25 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        // Midnight Ledger type system: Fraunces carries headings and the big
+        // KPI numerals (financial gravitas); Plex Sans carries UI + dense data
+        // (excellent tabular figures); Plex Mono carries slugs/SKU codes.
+        display: ["Fraunces", "Georgia", "serif"],
+        sans: ["'IBM Plex Sans'", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["'IBM Plex Mono'", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+      },
+      boxShadow: {
+        ledger: "0 1px 0 0 hsl(var(--border)), 0 12px 32px -16px hsl(222 60% 2% / 0.8)",
+        "ledger-lift": "0 1px 0 0 hsl(var(--brass) / 0.35), 0 20px 48px -20px hsl(222 60% 2% / 0.9)",
+      },
+      keyframes: {
+        "rise-in": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "rise-in": "rise-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
     },
   },

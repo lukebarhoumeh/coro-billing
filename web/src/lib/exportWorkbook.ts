@@ -57,7 +57,10 @@ export function buildCloseWorkbook(
     "Billed L": num(p.totalL),
     "Expected H (additive)": num(p.totalHExpected),
     "Actual H (Coro invoice)": num(p.totalHActual),
-    Margin: num(p.totalMargin),
+    "GP (margin)": num(p.totalMargin),
+    "GM %": p.totalL.isZero()
+      ? null
+      : Math.round((p.totalMargin.toNumber() / p.totalL.toNumber()) * 1000) / 10,
     "Held lines": p.heldLines,
     Status: review[p.slug]?.status ?? "unreviewed",
     Note: review[p.slug]?.note ?? "",
@@ -119,6 +122,9 @@ export function buildCloseWorkbook(
       "Actual H (invoice)": num(p.totalHActual),
       "Invoice qty": null,
       Margin: num(p.totalMargin),
+      "GM %": p.totalL.isZero()
+        ? null
+        : Math.round((p.totalMargin.toNumber() / p.totalL.toNumber()) * 1000) / 10,
       Basis: "",
       Match: "",
       Findings: p.heldLines > 0 ? `${p.heldLines} HELD line(s) excluded` : "",

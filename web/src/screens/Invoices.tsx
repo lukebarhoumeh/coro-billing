@@ -8,6 +8,9 @@
  * else the additive rule (expectedHAdditive); when the sheet's col H disagrees
  * with the additive rule, BOTH are shown. HELD lines (no rate) are amber and
  * excluded from totals — never rendered as zero-dollar rows.
+ *
+ * GP/GM language (MSP Hub): GP = the computed Money margin; GM = gmPct(GP,
+ * billed L). Both are screen-only — the printed invoice never shows cost.
  */
 import { useState } from "react";
 import { CheckCircle2, ChevronRight, Flag, Printer } from "lucide-react";
@@ -20,7 +23,7 @@ import type {
 } from "@pipeline/domain/types.js";
 import { useClose, type ReviewEntry, type ReviewStatus } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
-import { money } from "@/lib/format";
+import { gmPct, money } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExportBar } from "@/components/ExportBar";
@@ -61,9 +64,10 @@ function ReviewPill({ status }: { status: ReviewStatus | undefined }) {
 
 /* ----------------------------- list view -------------------------------- */
 
-function PartnerCard({ draft, status, onOpen }: {
+function PartnerCard({ draft, status, index, onOpen }: {
   draft: PartnerDraft;
   status: ReviewStatus | undefined;
+  index: number;
   onOpen: () => void;
 }) {
   const negative = draft.totalMargin.isNegative();
@@ -72,7 +76,8 @@ function PartnerCard({ draft, status, onOpen }: {
       role="button"
       tabIndex={0}
       data-testid={`invoice-card-${draft.slug}`}
-      className="cursor-pointer transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="rise cursor-pointer transition-colors hover:border-primary/60 hover:shadow-ledger-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      style={{ "--rise-i": index } as React.CSSProperties}
       onClick={onOpen}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -83,7 +88,9 @@ function PartnerCard({ draft, status, onOpen }: {
     >
       <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
         <div className="min-w-0">
-          <CardTitle className="truncate text-foreground">{draft.cardName}</CardTitle>
+          <CardTitle className="truncate text-sm font-medium normal-case tracking-normal text-foreground">
+            {draft.cardName}
+          </CardTitle>
           {draft.contact.contactEmail !== null && (
             <div className="truncate text-xs text-muted-foreground">
               {draft.contact.contactEmail}
@@ -93,10 +100,10 @@ function PartnerCard({ draft, status, onOpen }: {
         <ReviewPill status={status} />
       </CardHeader>
       <CardContent className="space-y-2">
-        <div className="text-2xl font-semibold tabular">{money(draft.totalL)}</div>
+        <div className="figure tabular text-2xl">{money(draft.totalL)}</div>
         <div className="text-sm">
-          <span className={negative ? "text-danger" : "text-success"}>
-            margin {money(draft.totalMargin)}
+          <span className={cn("tabular", negative ? "text-danger" : "text-success")}>
+            GP {money(draft.totalMargin)} · GM {gmPct(draft.totalMargin, draft.totalL)}
           </span>{" "}
           <span className="text-xs text-muted-foreground">({marginBasisLabel(draft)})</span>
         </div>
@@ -119,7 +126,7 @@ function ReviewToolbar({ slug, entry, setReview }: {
 }) {
   const [note, setNote] = useState(entry?.note ?? "");
   return (
-    <Card className="print:hidden">
+    <Card className="rise print:hidden" style={{ "--rise-i": 1 } as React.CSSProperties}>
       <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-start">
         <div className="flex flex-wrap items-center gap-2">
           <ReviewPill status={entry?.status} />
@@ -133,6 +140,7 @@ function ReviewToolbar({ slug, entry, setReview }: {
           <Button
             variant="outline"
             data-testid="flag-invoice"
+            className="border-warning/40 text-warning hover:bg-warning/10"
             onClick={() => setReview(slug, { status: "needs_review", note })}
           >
             <Flag className="h-4 w-4" />
@@ -199,7 +207,7 @@ function InvoiceLineRow({ line }: { line: DraftLine }) {
       <TR className={cn(held && "bg-warning/10", nfr && "text-muted-foreground")}>
         <TD>
           <div className={cn(!nfr && "font-medium")}>{line.productLabel}</div>
-          <div className="text-xs text-muted-foreground">{line.vendorSku}</div>
+          <div className="font-mono text-xs text-muted-foreground">{line.vendorSku}</div>
           {(badges.length > 0 || line.customers.length > 0) && (
             <div className="mt-1 flex flex-wrap items-center gap-1.5 print:hidden">
               {badges.map((label) => (
@@ -260,9 +268,14 @@ function InvoiceLineRow({ line }: { line: DraftLine }) {
         </TD>
         <TD className="text-right tabular print:hidden">
           {line.margin !== null ? (
-            <span className={marginNegative ? "text-danger" : "text-success"}>
-              {money(line.margin)}
-            </span>
+            <div>
+              <div className={marginNegative ? "text-danger" : "text-success"}>
+                {money(line.margin)}
+              </div>
+              <div className="text-xs text-muted-foreground print:hidden">
+                GM {gmPct(line.margin, line.amountL)}
+              </div>
+            </div>
           ) : (
             <span className="text-muted-foreground">—</span>
           )}
@@ -274,7 +287,7 @@ function InvoiceLineRow({ line }: { line: DraftLine }) {
         <TR className={cn("bg-muted/20", !expanded && "hidden print:table-row")}>
           <TD colSpan={6} className="py-2">
             <div className="pl-4 text-xs">
-              <div className="mb-1 uppercase tracking-wide text-muted-foreground">
+              <div className="microlabel mb-1">
                 By customer
               </div>
               {line.customers.map((c) => (
@@ -310,8 +323,8 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
   const negative = draft.totalMargin.isNegative();
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
-      <div className="print:hidden">
+    <div className="mx-auto max-w-4xl space-y-5">
+      <div className="rise print:hidden" style={{ "--rise-i": 0 } as React.CSSProperties}>
         <Button variant="ghost" data-testid="invoice-back" onClick={onBack}>
           ← All invoices
         </Button>
@@ -319,13 +332,19 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
 
       <ReviewToolbar key={draft.slug} slug={draft.slug} entry={entry} setReview={setReview} />
 
-      {/* The invoice document — the ONLY thing that prints. */}
-      <div className="print-invoice rounded-xl border border-border bg-card p-8 shadow-sm md:p-10">
+      {/* The invoice document — the ONLY thing that prints; the ledger's
+          design centerpiece on screen. */}
+      <div
+        className="print-invoice rise rounded-xl border border-border bg-card p-8 shadow-ledger md:p-10"
+        style={{ "--rise-i": 2 } as React.CSSProperties}
+      >
         {/* Bill-from */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-lg font-semibold tracking-tight">MSP Hub — Disti/MSP</div>
-            <div className="text-sm text-muted-foreground">Service period: {period}</div>
+            <div className="font-display text-xl font-semibold tracking-tight">
+              MSP Hub — Disti/MSP
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">Draft invoice · {period}</div>
           </div>
           <div className="flex items-center gap-2">
             <Badge>DRAFT</Badge>
@@ -333,14 +352,20 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
           </div>
         </div>
 
-        {/* Bill-to */}
-        <div className="mt-8">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Bill to</div>
-          <div className="mt-1 space-y-0.5 text-sm">
-            <div className="font-medium">{draft.cardName}</div>
-            {contactName !== null && <div>{contactName}</div>}
-            {contactEmail !== null && <div>{contactEmail}</div>}
-            {address !== null && <div>{address}</div>}
+        {/* Bill-to + service period */}
+        <div className="mt-8 flex flex-wrap gap-x-16 gap-y-6">
+          <div>
+            <div className="microlabel">Bill to</div>
+            <div className="mt-1.5 space-y-0.5 text-sm">
+              <div className="font-medium">{draft.cardName}</div>
+              {contactName !== null && <div>{contactName}</div>}
+              {contactEmail !== null && <div>{contactEmail}</div>}
+              {address !== null && <div>{address}</div>}
+            </div>
+          </div>
+          <div>
+            <div className="microlabel">Service period</div>
+            <div className="mt-1.5 text-sm font-medium">{period}</div>
           </div>
         </div>
 
@@ -353,7 +378,7 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
               <TH className="text-right">Unit price</TH>
               <TH className="text-right">Amount</TH>
               <TH className="text-right print:hidden">Cost / unit</TH>
-              <TH className="text-right print:hidden">Margin</TH>
+              <TH className="text-right print:hidden">GP</TH>
             </TR>
           </THead>
           <TBody>
@@ -364,7 +389,7 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
         </Table>
 
         {/* Totals */}
-        <div className="mt-6 flex justify-end">
+        <div className="mt-8 flex justify-end">
           <div className="w-full max-w-sm space-y-1.5 text-sm">
             {draft.heldLines > 0 && (
               <div className="text-right text-xs text-warning">
@@ -372,9 +397,9 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
                 total
               </div>
             )}
-            <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
-              <span>Total due</span>
-              <span className="tabular">{money(draft.totalL)}</span>
+            <div className="flex items-baseline justify-between border-t border-border pt-3">
+              <span className="microlabel">Total due</span>
+              <span className="figure tabular text-2xl text-primary">{money(draft.totalL)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground print:hidden">
               <span>Expected cost (additive rule)</span>
@@ -387,9 +412,17 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
               </div>
             )}
             <div className="flex justify-between print:hidden">
-              <span className="text-muted-foreground">Margin ({marginBasisLabel(draft)})</span>
+              <span className="text-muted-foreground">
+                Gross profit (GP) — {marginBasisLabel(draft)}
+              </span>
               <span className={cn("tabular", negative ? "text-danger" : "text-success")}>
                 {money(draft.totalMargin)}
+              </span>
+            </div>
+            <div className="flex justify-between print:hidden">
+              <span className="text-muted-foreground">Gross margin (GM)</span>
+              <span className={cn("tabular", negative ? "text-danger" : "text-success")}>
+                {gmPct(draft.totalMargin, draft.totalL)}
               </span>
             </div>
           </div>
@@ -432,9 +465,9 @@ export function InvoicesScreen({ context }: ScreenProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Draft invoices</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+          <h1 className="figure rule-brass text-2xl">Draft invoices</h1>
+          <p className="pt-1 text-sm text-muted-foreground">
             One draft per MSP partner for {period}. Open each to double-check the lines, approve or
             flag it, and print. Held lines are excluded from totals until resolved.
           </p>
@@ -443,11 +476,12 @@ export function InvoicesScreen({ context }: ScreenProps) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {model.partners.map((p) => (
+        {model.partners.map((p, i) => (
           <PartnerCard
             key={p.slug}
             draft={p}
             status={review[p.slug]?.status}
+            index={i + 1}
             onOpen={() => setSelectedSlug(p.slug)}
           />
         ))}

@@ -5,18 +5,21 @@
  * — it is the partner's price, never "our cost". "Sheet cost" is col H exactly
  * as written (untrusted; validated elsewhere against E×0.95 and the additive
  * rule). Sheet-math and card-level findings surface inline, never hidden.
+ * Active partners also carry an indicative GP/GM line read from the close's
+ * PartnerDraft (never recomputed here).
  */
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { useClose } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
-import { money } from "@/lib/format";
+import { money, gmPct } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, severityVariant } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import type {
   Exception,
   ExceptionKind,
+  PartnerDraft,
   PricingPartner,
   PricingRow,
 } from "@pipeline/domain/types.js";
@@ -63,10 +66,16 @@ function PartnerCard({
   card,
   active,
   findings,
+  draft,
+  riseIndex,
 }: {
   card: PricingPartner;
   active: boolean;
   findings: readonly Exception[];
+  /** The close's draft for this partner (slug === workspaceId); null for quiet partners. */
+  draft: PartnerDraft | null;
+  /** Staggered entrance index (capped by the caller). */
+  riseIndex: number;
 }) {
   // Card-level findings, grouped by kind so a noisy card stays one badge per kind.
   const cardFindings = useMemo(() => {
@@ -97,12 +106,14 @@ function PartnerCard({
     .join(" · ");
 
   return (
-    <Card>
+    <Card className="rise" style={{ "--rise-i": riseIndex } as React.CSSProperties}>
       <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-sm font-semibold text-foreground">{card.name}</CardTitle>
+          <CardTitle className="font-display text-base font-semibold normal-case tracking-normal text-foreground">
+            {card.name}
+          </CardTitle>
           {card.workspaceId !== null && (
-            <span className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+            <span className="rounded border border-border/60 bg-muted/60 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
               {card.workspaceId}
             </span>
           )}
@@ -113,6 +124,21 @@ function PartnerCard({
           )}
           {isStandardTier(card.rows) && <Badge variant="info">standard tier</Badge>}
         </div>
+        {draft !== null && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="microlabel">Indicative GM (vs sheet cost)</span>
+            <span className="tabular text-xs text-foreground">
+              GP {money(draft.totalMargin)}
+            </span>
+            <Badge
+              className="tabular"
+              variant={draft.totalMargin.isNegative() ? "danger" : "success"}
+              title="Gross margin this month: GP (draft margin) ÷ billed L, from the close's partner draft"
+            >
+              {gmPct(draft.totalMargin, draft.totalL)} GM
+            </Badge>
+          </div>
+        )}
         {cardFindings.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {cardFindings.map(([kind, list]) => (
@@ -137,7 +163,7 @@ function PartnerCard({
               <TH className="text-right">List</TH>
               <TH className="text-right">MSP disc</TH>
               <TH className="text-right">Hub disc</TH>
-              <TH className="text-right">Partner pays</TH>
+              <TH className="text-right text-primary">Partner pays</TH>
               <TH className="text-right">Sheet cost</TH>
               <TH className="text-right">Total disc</TH>
             </TR>
@@ -158,16 +184,24 @@ function PartnerCard({
                       {row.netMsp === null && <Badge variant="danger">no price</Badge>}
                     </div>
                   </TD>
-                  <TD className="tabular text-right">{moneyCell(row.listPrice)}</TD>
-                  <TD className="tabular text-right">{fmtPct(row.mspDiscountPct)}</TD>
-                  <TD className="tabular text-right">{fmtPct(row.hubDiscountPct)}</TD>
-                  <TD className="tabular text-right font-semibold text-foreground">
+                  <TD className="tabular text-right text-muted-foreground">
+                    {moneyCell(row.listPrice)}
+                  </TD>
+                  <TD className="tabular text-right text-muted-foreground">
+                    {fmtPct(row.mspDiscountPct)}
+                  </TD>
+                  <TD className="tabular text-right text-muted-foreground">
+                    {fmtPct(row.hubDiscountPct)}
+                  </TD>
+                  <TD className="tabular text-right font-medium text-foreground">
                     {moneyCell(row.netMsp)}
                   </TD>
                   <TD className="tabular text-right text-muted-foreground">
                     {moneyCell(row.netHubStated)}
                   </TD>
-                  <TD className="tabular text-right">{fmtPct(row.totalDiscountPct)}</TD>
+                  <TD className="tabular text-right text-muted-foreground">
+                    {fmtPct(row.totalDiscountPct)}
+                  </TD>
                 </TR>
               );
             })}
@@ -197,6 +231,12 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
     [model]
   );
 
+  /** The close's drafts by slug — source of the card-level GP/GM line. */
+  const draftBySlug = useMemo(
+    () => new Map((model?.partners ?? []).map((p) => [p.slug, p])),
+    [model]
+  );
+
   const q = query.trim().toLowerCase();
   const filtered = useMemo(() => {
     if (q === "") return partners;
@@ -209,13 +249,14 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
 
   if (pricing === null) {
     return (
-      <div className="mx-auto mt-16 max-w-md text-center text-sm text-muted-foreground">
-        <p className="mb-3">
+      <div className="mx-auto mt-16 max-w-md text-center">
+        <p className="figure mb-2 text-xl text-foreground">No rate card on the ledger</p>
+        <p className="mb-4 text-sm text-muted-foreground">
           No special-pricing file loaded — the rate card comes from the Coro Special MSP Pricing
           CSV.
         </p>
         <button
-          className="text-primary underline"
+          className="text-sm text-primary underline underline-offset-4"
           data-testid="ratecard-goto-intake"
           onClick={() => onNavigate("intake")}
         >
@@ -227,15 +268,18 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Rate cards</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+        <h1 className="figure rule-brass text-2xl">Rate cards</h1>
+        <p className="pt-1 text-sm text-muted-foreground">
           The full Coro special-pricing card per partner — every product, including ones with no
           usage this month. "Partner pays" is the net price to the MSP (what they pay MSP Hub).
         </p>
       </div>
 
-      <div className="sticky top-0 z-10 -mx-2 flex flex-wrap items-center gap-3 rounded-lg bg-background/95 px-2 py-2 backdrop-blur">
+      <div
+        className="rise sticky top-0 z-10 -mx-2 flex flex-wrap items-center gap-3 rounded-lg border border-transparent bg-background/95 px-2 py-2 backdrop-blur"
+        style={{ "--rise-i": 1 } as React.CSSProperties}
+      >
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -247,7 +291,7 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
             className="w-full rounded-md border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
-        <span className="text-xs text-muted-foreground">
+        <span className="microlabel tabular">
           {filtered.length} of {partners.length} partners
         </span>
       </div>
@@ -258,12 +302,16 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
         </p>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
-          {filtered.map((card) => (
+          {filtered.map((card, i) => (
             <PartnerCard
               key={`${card.name}#${card.sourceRow}`}
               card={card}
               active={card.workspaceId !== null && activeSlugs.has(card.workspaceId)}
               findings={model?.findings ?? []}
+              draft={
+                card.workspaceId !== null ? (draftBySlug.get(card.workspaceId) ?? null) : null
+              }
+              riseIndex={Math.min(i + 2, 8)}
             />
           ))}
         </div>
