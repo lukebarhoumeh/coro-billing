@@ -93,7 +93,44 @@ Place the special-pricing workbook alongside the month's packet (or wherever the
 
 ---
 
-## Step 3 — Run the pipeline (usage → H/L → proposed invoices, by customer)
+## Step 3 (AUGUST 2026 PATH) — The invoice-driven close
+
+**August 2026 changed the design** (see `docs/AUGUST_CLOSE_PLAN.md`): Coro invoice
+2193 arrived already carrying H (Rate/Subtotal) AND L (Client Price/charge) per
+partner×SKU — it IS the pricing authority and the recreation target. The special
+pricing file (Step 2) has not landed (only a SharePoint shortcut came through), and
+for this close it is not needed. Run:
+
+```bash
+npx tsx src/cli/index.ts close --data data/2026-08 --month 2026-08 --invoice 2193 --invoice-date 2026-09-15
+```
+
+What `close` does: parses usage (reducing Coro's Users/Devices metric rows to billed
+quantities per the file's own Audit rules, mapping workspace slugs to invoice names
+via `src/config/partners.ts`) → takes H and L from the invoice per partner×SKU →
+allocates each invoice line down to customers by usage weights (largest remainder —
+per-customer cents ALWAYS sum to the invoice Subtotal) → prints the tie-out report →
+exports the QuickBooks CSV.
+
+The acceptance gate is printed on the first line: **allocated H + out-of-period H
+must equal the invoice's Total Before Tax cent-exact** ($13,151.64 for August).
+Verified 2026-09-15: ties cent-exact; 48/48 usage-covered lines tie quantity; 0 held.
+
+Findings the August close surfaces (review, then decide):
+- **Two July Rocker lines on invoice 2193** ("Jul period billed again — already on
+  INV-0001914") — excluded from the August allocation, still in the invoice total.
+  Raise the double-billing with Coro.
+- **Vaiman: 50 seats consumed, no Coro invoice line** — Coro billed nothing; we bill
+  nothing (never invent revenue); ask Coro whether the cutover missed them.
+- **5 negative-margin lines** (Cyber Construction/GOA-TECH/Net-Tech BUCOCLASSflex,
+  Net-Tech BUEMAILflex, Teledata BUENDflex) — L ≤ H; repricing conversation.
+
+The legacy usage → rate-card path below (`run`/`reconcile`/`export`) remains for
+when Jack's special pricing lands — it then becomes the H/L *validation* path.
+
+---
+
+## Step 3 (RATE-CARD PATH) — Run the pipeline (usage → H/L → proposed invoices, by customer)
 
 ```bash
 coro-billing run --data data/2026-08 --month 2026-08 --out out/
@@ -235,7 +272,11 @@ interpreting U/D. If the rate is not written down, **hold**.
 ## Quick command reference
 
 ```bash
-# Full month-end run (ingest → rate → invoice → checks → export)
+# Invoice-driven close (August 2026 path): the Coro invoice IS the pricing authority.
+# Non-zero exit if the H tie breaks or any line is held.
+coro-billing close     --data data/YYYY-MM --month YYYY-MM --invoice <number> [--format csv|iif] [--invoice-date YYYY-MM-DD]
+
+# Full month-end run via the rate card (when Jack's special pricing is present)
 # Non-zero exit if any line is held (blocking exception) or any check fails.
 coro-billing run       --data data/YYYY-MM --month YYYY-MM [--out out/] [--invoice-date YYYY-MM-DD] [--due-date YYYY-MM-DD]
 

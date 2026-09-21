@@ -23,7 +23,13 @@ These are the documents Luke listed for the current cycle. Binaries belong in th
 | Lindita’s August billing workbook | **Needed.** The mimic target: column H = our price, column L = what we’re charging. Internal only. |
 | Brandon/Jack special pricing | **Needed.** Current SKUs now; legacy in the same format (per partner, per SKU, their price + our price). |
 
-Status of this clone: the **call transcript is in this folder**. The Coro workbooks (usage, invoices, MSRP, agreement) and Lindita/Jack files still need to be dropped in if they are not already here.
+Status of this clone (2026-09-15): the **call transcript is in this folder**, and the
+**real August packet is in `2026-08/`** (usage, invoices 1914 + 2193, MSRP; the agreement
+PDF is in `agreement/`). All of these are **git-ignored** — proprietary Coro financial
+data never leaves this machine via the repo. Still missing: **Jack's special pricing**
+(`Coro Special MSP Pricing.xlsx` — only a SharePoint `.url` shortcut came through; open it
+and download the real workbook) and Lindita's manual workbook (no longer blocking:
+invoice 2193's Invoice Detail tab carries H and L — see `docs/AUGUST_CLOSE_PLAN.md`).
 
 ## Naming convention going forward
 

@@ -3,6 +3,15 @@
 What each real file must contain for the pipeline to price it, and where every rule
 comes from in the Sep 11 2026 call (`data/Call with Luke Barhoumeh (2).docx`).
 
+> **Real-file addendum (2026-09-15):** the actual August packet landed and its layouts
+> are now encoded as column aliases in `pipeline.config.ts` and documented in
+> `docs/AUGUST_CLOSE_PLAN.md`. Two headline facts: the usage file is a **two-rows-per-SKU
+> metric model** (`Metric` = Users | Devices, billed qty stated in the row's own `Audit`
+> string — reduced by `ingest/usageReduce.ts`), and invoice 2193's **`Subtotal` is the
+> authoritative H total** (`Rate` is display-rounded; never bill `Rate × Qty`). Usage
+> partners are workspace slugs mapped to invoice names by the curated table in
+> `src/config/partners.ts`.
+
 ## Expected columns (edit aliases in `src/config/pipeline.config.ts`, not code)
 
 ### Coro monthly usage (`MSP Hub_August 2026 Usage.xlsx`, usage tab)
