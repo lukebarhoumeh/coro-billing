@@ -47,6 +47,13 @@ export interface UsageLine {
   readonly period: Period;
   /** The MSP Hub bills (Meeting Tree, Amplivity, ...). */
   readonly partner: string;
+  /**
+   * Raw Coro parent-workspace slug exactly as the usage file keys it
+   * (`amplivitycom_NE7N_b`). The special-pricing CSV joins on THIS (its
+   * "Workspace ID" column), not on the mapped display name. Set by reduceUsage;
+   * absent on hand-built fixtures and pre-reduction lines.
+   */
+  readonly partnerSlug?: string;
   /** End customer = child account / workspace under the partner. May be blank for partner-level rows. */
   readonly customer: string | null;
   readonly sku: Sku;

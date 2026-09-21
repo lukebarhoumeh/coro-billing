@@ -219,6 +219,8 @@ export function reduceUsage(lines: readonly UsageLine[]): ReducedUsage {
     billed.push({
       ...rest,
       partner: g.partner,
+      // Raw parent slug pre-mapping — the special-pricing CSV joins on this.
+      partnerSlug: line.partner,
       customer: g.customer,
       quantity,
     });

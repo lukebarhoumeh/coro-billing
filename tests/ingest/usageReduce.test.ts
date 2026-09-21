@@ -193,6 +193,20 @@ describe("reduceUsage — real metric model", () => {
   });
 });
 
+describe("reduceUsage — partner slug carry-through", () => {
+  it("carries the raw parent workspace slug on every reduced line (rate-card join key)", () => {
+    const audit = "LEGACY | u=13 d=14 | CORO_ESSENTIALS=14 [math.max(users, devices)]";
+    const lines = parse([
+      [2, "amplivitycom_NE7N_b", "alnobaorg_O2MB_b", "CHILD", "SUBSCRIPTION", "LEGACY", "US", audit, "CORO_ESSENTIALS", "BUCOROflex", "Users", 13],
+      [2, "amplivitycom_NE7N_b", "alnobaorg_O2MB_b", "CHILD", "SUBSCRIPTION", "LEGACY", "US", audit, "CORO_ESSENTIALS", "BUCOROflex", "Devices", 14],
+    ]);
+    const { billed } = reduceUsage(lines);
+    expect(billed).toHaveLength(1);
+    expect(billed[0]!.partnerSlug).toBe("amplivitycom_NE7N_b"); // raw, pre-mapping
+    expect(billed[0]!.partner).toBe("Amplivity"); // mapped display name unchanged
+  });
+});
+
 describe("reduceUsage — pass-through for non-metric files", () => {
   it("leaves synthetic-format lines intact (quantities already billed), mapping partners only", () => {
     const r = parseUsage(
