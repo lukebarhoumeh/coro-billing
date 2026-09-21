@@ -33,3 +33,5 @@ data/**/*.xlsx
 data/**/*.xls
 data/**/*.pdf
 data/2026-*/
+.vercel
+.env*
