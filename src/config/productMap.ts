@@ -23,18 +23,10 @@
  *   - A miss returns kind "none" — NEVER a cross-product or cross-partner
  *     fallback (Dane: "all these partners are on different stuff").
  */
-import type { PricingPartner, PricingRow } from "../domain/types.js";
+import type { MatchKind, PricingPartner, PricingRow } from "../domain/types.js";
 import { normalizeProduct } from "../ingest/specialPricing.js";
 
-export type MatchKind =
-  | "exact" // code's own product row (current-gen name or the bundle's flex row)
-  | "specific-flex" // MOD code matched its product-specific flex row ("Network Flex")
-  | "modules-flex" // MOD/ADD/SAT code matched a generic modules-flex row
-  | "sat-flex" // Modsatflex matched the partner's "SAT Flex" row
-  | "fallback-current" // legacy/flex code priced from the current-gen row (surfaced)
-  | "assumed-add" // ADD*flex matched via the modules chain — unconfirmed mapping
-  | "nfr" // not-for-resale — non-billable
-  | "none"; // no pricing row at all — the close HOLDS the line
+export type { MatchKind } from "../domain/types.js";
 
 export interface RowMatch {
   readonly row: PricingRow | null;

@@ -370,3 +370,95 @@ export interface SpecialPricingResult {
   /** In-file validation findings (sheet-math, duplicates, missing workspace ids…). */
   readonly findings: readonly Exception[];
 }
+
+/**
+ * Kind of pricing-row match for a usage product code (resolved by
+ * src/config/productMap.ts — the curated code→name bridge).
+ */
+export type MatchKind =
+  | "exact" // code's own product row (current-gen name or the bundle's flex row)
+  | "specific-flex" // MOD code matched its product-specific flex row ("Network Flex")
+  | "modules-flex" // MOD/ADD/SAT code matched a generic modules-flex row
+  | "sat-flex" // Modsatflex matched the partner's "SAT Flex" row
+  | "fallback-current" // legacy/flex code priced from the current-gen row (surfaced)
+  | "assumed-add" // ADD*flex matched via the modules chain — unconfirmed mapping
+  | "nfr" // not-for-resale — non-billable
+  | "none"; // no pricing row at all — the close HOLDS the line
+
+/** Per-customer share of a draft invoice line (child-workspace breakdown). */
+export interface DraftCustomerShare {
+  /** Child workspace slug; null = the partner's own (CHANNEL) workspace. */
+  readonly customer: string | null;
+  readonly quantity: number;
+}
+
+/**
+ * One product line on a per-MSP draft invoice (rate-card close).
+ *
+ * Money semantics (spec 2026-09-21): unitL is pricing col E — what the MSP pays
+ * Hub. Cost is shown under BOTH rules (sheet col H vs the additive rule Coro
+ * actually bills); when a Coro invoice is loaded its Subtotal is the
+ * authoritative actual cost and drives margin. Null unitL ⇒ the line is HELD.
+ */
+export interface DraftLine {
+  readonly vendorSku: string;
+  /** Pricing-row product name, or the usage product name when unpriced. */
+  readonly productLabel: string;
+  /** Audit-derived billed quantity (sum over customers). */
+  readonly quantity: number;
+  readonly customers: readonly DraftCustomerShare[];
+  readonly matchKind: MatchKind;
+  readonly unitL: Money | null;
+  readonly amountL: Money | null;
+  /** Pricing col H as stated (fallback E×0.95 when the cell is blank). */
+  readonly expectedHSheet: Money | null;
+  /** list × (1 − (F+G)/100) — the rule Coro's real invoices follow. */
+  readonly expectedHAdditive: Money | null;
+  /** Coro invoice Subtotal ÷ invoice qty (display), when an invoice is loaded. */
+  readonly actualHUnit: Money | null;
+  /** Coro invoice Subtotal for this partner×sku — authoritative actual cost. */
+  readonly actualHAmount: Money | null;
+  readonly invoiceQuantity: number | null;
+  /** amountL − (actualHAmount ?? expectedHAdditive×qty); null when no basis. */
+  readonly margin: Money | null;
+  readonly marginBasis: "actual" | "expected-additive" | "none";
+  readonly findings: readonly Exception[];
+}
+
+/** One MSP's draft invoice for the month. */
+export interface PartnerDraft {
+  /** Raw workspace slug (lowercased) — the join key across all three sources. */
+  readonly slug: string;
+  /** Special-pricing CSV partner name ("Seven Star Systems"). */
+  readonly cardName: string;
+  /** Coro-invoice display name from the curated slug map, when known. */
+  readonly invoiceName: string | null;
+  readonly contact: Pick<
+    PricingPartner,
+    "contactName" | "contactPhone" | "contactEmail" | "address"
+  >;
+  readonly lines: readonly DraftLine[];
+  /** Sum of billable amountL (held + NFR lines excluded). */
+  readonly totalL: Money;
+  /** Sum of expectedHAdditive×qty over billable lines that have it. */
+  readonly totalHExpected: Money;
+  /** Sum of actualHAmount; null until at least one invoice line matched. */
+  readonly totalHActual: Money | null;
+  readonly totalMargin: Money;
+  readonly heldLines: number;
+}
+
+/** The rate-card close: everything the dashboard renders. */
+export interface CloseModel {
+  readonly period: Period;
+  /** Sorted by cardName. */
+  readonly partners: readonly PartnerDraft[];
+  /** Rate-card partners with no usage this month. */
+  readonly cardOnly: readonly PricingPartner[];
+  /** Usage parents with no special-pricing block. */
+  readonly usageOnly: readonly { readonly slug: string; readonly partner: string }[];
+  /** Global findings + roll-up of every line finding, deterministic order. */
+  readonly findings: readonly Exception[];
+  /** For buildInvoices → QuickBooks export reuse (billable lines only). */
+  readonly ratedLines: readonly RatedLine[];
+}
