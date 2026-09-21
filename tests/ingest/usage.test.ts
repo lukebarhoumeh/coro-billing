@@ -232,3 +232,39 @@ describe("parseUsage", () => {
     expect(isErr(r)).toBe(true);
   });
 });
+
+describe("parseUsage — per-partner 'by product' export (July 2026 TechLead schema)", () => {
+  // Real schema from "Techlead Professional Services, LLC__Usage_July_2026_by_product.xlsx":
+  // one row per workspace×product with the BILLED quantity and a "Unit" rule column —
+  // no Metric rows, no Audit strings, and the parent is called "MSP Parent".
+  const BYPRODUCT_HEADER = [
+    "#", "Workspace", "MSP Parent", "Type", "Sub Type", "Billing Mode",
+    "Region", "Product", "Product Code", "Quantity", "Unit",
+  ];
+
+  it("reads MSP Parent as the partner and Workspace as the customer", () => {
+    const r = parseUsage(
+      wb([
+        BYPRODUCT_HEADER,
+        [6, "techlpcom_CKC5_b", "techlpcom_CKC5_b", "CHANNEL", "SUBSCRIPTION", "LEGACY", "US", "CORO_MANAGED_COMPLETE", "BUCOMMNGflex", 7, "users"],
+        [7, "accountservices-usacom_HLRC_b", "techlpcom_CKC5_b", "CHILD", "SUBSCRIPTION", "LEGACY", "US", "CORO_MANAGED_COMPLETE", "BUCOMMNGflex", 11, "users"],
+        [21, "saneurocom_QIUP_b", "techlpcom_CKC5_b", "CHILD", "SUBSCRIPTION", "LEGACY", "US", "CORO_ESSENTIALS", "BUCOROflex", 10, "math.max(users, devices)"],
+      ]),
+      { period: "2026-07" }
+    );
+    expect(isOk(r)).toBe(true);
+    if (!isOk(r)) return;
+    expect(r.value).toHaveLength(3);
+    const [channel, child, ess] = r.value;
+    expect(channel!.partner).toBe("techlpcom_CKC5_b");
+    expect(channel!.customer).toBe("techlpcom_CKC5_b"); // own workspace; reduce folds to null
+    expect(channel!.wsType).toBe("CHANNEL");
+    expect(channel!.quantity).toBe(7);
+    // Quantities are already billed; there is NO metric model in this format —
+    // the "Unit" rule column must NOT be mistaken for a Users/Devices metric label.
+    expect(channel!.metric).toBeUndefined();
+    expect(child!.customer).toBe("accountservices-usacom_HLRC_b");
+    expect(ess!.sku.vendorSku).toBe("BUCOROflex");
+    expect(ess!.sku.isLegacy).toBe(true); // Billing Mode LEGACY
+  });
+});

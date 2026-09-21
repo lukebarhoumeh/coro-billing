@@ -56,7 +56,9 @@ export interface ColumnMap {
  *     quantity is derived per the row's own "Audit" rule — see ingest/usageReduce.ts.
  */
 export const USAGE_COLUMN_MAP: ColumnMap = {
-  partner: ["partner", "partner name", "reseller", "msp", "parent workspace"],
+  // "msp parent": the per-partner "…by_product" export (first seen July 2026,
+  // TechLead) names the parent column "MSP Parent" instead of "Parent Workspace".
+  partner: ["partner", "partner name", "reseller", "msp", "parent workspace", "msp parent"],
   customer: ["workspace", "child account", "customer", "account", "tenant"],
   sku: ["sku", "sku code", "item", "product code"],
   product: ["product", "product name"],
