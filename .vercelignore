@@ -1,0 +1,9 @@
+# NEVER upload the real Coro packets (proprietary customer/financial data).
+# The app parses files in the browser at runtime; the deployment carries no data.
+data/
+out/
+coverage/
+dist/
+web/dist/
+node_modules/
+web/node_modules/
