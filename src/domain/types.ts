@@ -56,6 +56,21 @@ export interface UsageLine {
   readonly subtype?: string;
   /** What was actually consumed. */
   readonly product?: string;
+  /**
+   * Real Coro usage metric row label ("Users" | "Devices"). The August 2026 file
+   * carries each (workspace, SKU) TWICE, once per metric; the billed quantity is
+   * derived per the row's own `audit` rule (ingest/usageReduce.ts). Absent on
+   * synthetic/legacy-format files.
+   */
+  readonly metric?: string;
+  /**
+   * Coro's own audit string, e.g. "LEGACY | u=13 d=14 | CORO_ESSENTIALS=14
+   * [math.max(users, devices)]". States the billed quantity AND the reduction rule
+   * per product — the closest thing to Coro's rating spec we have. Carried verbatim.
+   */
+  readonly audit?: string;
+  /** Workspace row type ("CHANNEL" = the partner's own workspace, "CHILD" = end customer). */
+  readonly wsType?: string;
   /** Dane: "I don't really know what U and D mean." Carried, never interpreted. */
   readonly u: UnknownField;
   readonly d: UnknownField;
@@ -72,7 +87,17 @@ export interface MsrpEntry {
   readonly raw: Record<string, unknown>;
 }
 
-/** A single line on a Coro -> Hub invoice (1914, 2193). */
+/**
+ * A single line on a Coro -> Hub invoice (1914, 2193).
+ *
+ * Real-file semantics (docs/AUGUST_CLOSE_PLAN.md, facts 1–2):
+ *   - `amount` (the "Subtotal" column) is the AUTHORITATIVE H total — Coro computes
+ *     it on the unrounded net rate, so `unitPrice * quantity` may differ by cents.
+ *   - `clientPrice` is the exact L unit (what Hub bills the MSP); `chargeAmount` is
+ *     the sheet's L total. `clientPrice === null` means the cell was blank (L
+ *     unresolved — held, never fabricated); `undefined` means the column is absent
+ *     entirely (e.g. invoice 1914's simpler layout).
+ */
 export interface CoroInvoiceLine {
   readonly invoiceNumber: string;
   readonly lineNumber: number;
@@ -83,6 +108,19 @@ export interface CoroInvoiceLine {
   readonly unitPrice: Money;
   readonly amount: Money;
   readonly period?: Period;
+  /** L unit ("Client Price"). null = blank cell (unresolved); undefined = column absent. */
+  readonly clientPrice?: Money | null;
+  /** The sheet's own L total ("charge"), used to cross-check clientPrice × quantity. */
+  readonly chargeAmount?: Money | null;
+  /** Product display name ("Product Name"), for invoice-line descriptions. */
+  readonly productName?: string;
+  /** Line service window as ISO dates (from "Start Date"/"End Date"), when present. */
+  readonly startDate?: string;
+  readonly endDate?: string;
+  /** The month the line's service window falls in ("YYYY-MM"), derived from startDate. */
+  readonly servicePeriod?: Period;
+  /** Free-text note keyed on the line (e.g. "Jul period billed again"). */
+  readonly note?: string;
   readonly raw: Record<string, unknown>;
 }
 
@@ -158,7 +196,14 @@ export type ExceptionKind =
   | "NEGATIVE_OR_ZERO_QTY"
   | "PARTNER_SPECIAL_DEAL" // matched an exception rate, flagged for visibility
   | "COST_DISAGREES_WITH_INVOICE" // H * qty != Coro invoice amount
-  | "SKU_CLASS_NOISE"; // SKU could not be classified current/legacy
+  | "SKU_CLASS_NOISE" // SKU could not be classified current/legacy
+  // --- Invoice-driven close (docs/AUGUST_CLOSE_PLAN.md D3/D4/D6) ---
+  | "USAGE_QTY_DISAGREES" // usage-derived billed qty != invoice quantity (finding, still billable)
+  | "NO_USAGE_BREAKDOWN" // invoice line has no usage detail — billed partner-level, not by customer
+  | "USAGE_NOT_ON_INVOICE" // consumed per usage but Coro billed nothing — NOT billed to the MSP
+  | "OUT_OF_PERIOD_LINE" // invoice line whose service window is outside the close month
+  | "UNMAPPED_PARTNER" // usage workspace slug not in the curated partner map
+  | "AUDIT_QTY_MISMATCH"; // Coro's audit-stated qty != our users/devices reduction
 
 export interface Exception {
   readonly kind: ExceptionKind;

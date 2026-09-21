@@ -347,21 +347,23 @@ When the app is built, it lives in this repo. Do not start a second repo for “
 
 ## How to run this (today)
 
-The pipeline is **built and proven end-to-end** — but on **synthetic** fixtures
-(`fixtures/synthetic/`, clearly labeled, *not* real rates), because the real Coro/
-Jack/Lindita files are not in the repo yet. Per-partner **H/L come only from real
-rate-card files**; nothing is hardcoded except the 5% buffer and 45% legacy discount,
-both quoted from the call. It is structured for **plug-and-play**: drop the real files
-in and it prices them — exactly what Luke committed to on the call.
+**The real August 2026 close runs and ties cent-exact** (2026-09-15). The real packet
+landed and inverted one design assumption: Coro invoice **2193 arrived already carrying
+H (Rate/Subtotal) and L (Client Price)** per partner×SKU, so the invoice is the pricing
+authority and the recreation target — see **[`docs/AUGUST_CLOSE_PLAN.md`](docs/AUGUST_CLOSE_PLAN.md)**.
+The real files live in `data/2026-08/` and are **git-ignored** (proprietary; never pushed).
 
 ```bash
 pnpm install                 # Node 20+ (22 recommended)
-pnpm test                    # 131 tests, incl. the golden recreate-vs-Lindita test
+pnpm test                    # 177 tests, incl. 9 real-data integration tests (auto-skip without data/)
 pnpm typecheck               # strict TypeScript, clean
 
-# Once the real files land in data/YYYY-MM/ (usage, special pricing, Lindita's workbook):
+# The August 2026 close (invoice-driven): ties $13,151.64 cent-exact, 48/48 qty ties
+npx tsx src/cli/index.ts close --data data/2026-08 --month 2026-08 --invoice 2193 --invoice-date 2026-09-15
+
+# The rate-card path (when Jack's special pricing lands — becomes the H/L validation path):
 npx tsx src/cli/index.ts run       --data data/2026-08 --month 2026-08 --out out/
-npx tsx src/cli/index.ts reconcile --data data/2026-08 --month 2026-08   # the acceptance gate
+npx tsx src/cli/index.ts reconcile --data data/2026-08 --month 2026-08
 npx tsx src/cli/index.ts export    --data data/2026-08 --month 2026-08 --format csv
 # (or `pnpm build` then use the packaged `coro-billing` binary)
 ```
@@ -380,8 +382,9 @@ Status of the build (against the spec above):
 2. ✅ Attach **H** and **L** per partner × SKU (class-aware, no house average), break the bill down **by customer**, margin follows.
 3. ✅ Recreate the month and diff against Lindita (`reconcile`) — the acceptance gate, proven cent-exact on synthetic fixtures.
 4. ✅ QuickBooks **export** (QBO import CSV + Desktop IIF); a documented QBO-API adapter is scaffolded (stub, not wired).
-5. ⏳ **Drop the real binaries into `data/`** (Lindita’s August workbook, Jack/Brandon special pricing, the Coro usage/invoice/MSRP files) — then re-run `reconcile` for the real August-vs-Lindita tie-out.
-6. ⏳ A small internal web UI for month-end exceptions (sits on top of this pipeline; does not replace it).
+5. ✅ **The real August 2026 close** (2026-09-15): packet in `data/2026-08/` (git-ignored), invoice-driven `close` command ties **$13,151.64 cent-exact**, 48/48 usage-qty ties, 15 outbound MSP invoices ($15,611.06), real findings surfaced (July double-billing on 2193, Vaiman consumed-but-unbilled, 5 negative-margin lines). See `docs/AUGUST_CLOSE_PLAN.md`.
+6. ⏳ **Jack's special pricing** (`Coro Special MSP Pricing.xlsx`) — only a SharePoint shortcut came through; once downloaded, the rate-card path validates the invoice's H/L per partner.
+7. ⏳ A small internal web UI for month-end exceptions (sits on top of this pipeline; does not replace it).
 
-Nothing here guesses a rate. Until the real files are in `data/`, the numbers you see
-come only from the clearly-labeled synthetic fixtures — never presented as a real close.
+Nothing here guesses a rate. The August close bills only what Coro invoiced — every
+disagreement between usage and the invoice is surfaced, never silently reconciled.

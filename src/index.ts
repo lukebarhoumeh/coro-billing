@@ -92,7 +92,13 @@ export { parseUsage } from "./ingest/usage.js";
 export { parseRateCard } from "./ingest/rateCard.js";
 export { parseLinditaWorkbook } from "./ingest/lindita.js";
 export { parseMsrp } from "./ingest/msrp.js";
-export { parseCoroInvoice } from "./ingest/coroInvoice.js";
+export { parseCoroInvoice, parseDateCell } from "./ingest/coroInvoice.js";
+export { reduceUsage, parseAuditEntry } from "./ingest/usageReduce.js";
+export type { ReducedUsage } from "./ingest/usageReduce.js";
+
+// --- Partner identity (usage workspace slugs → invoice names) ----------------
+export { canonicalPartner, stripWorkspaceSuffix, PARTNER_SLUG_MAP } from "./config/partners.js";
+export type { CanonicalPartner } from "./config/partners.js";
 
 // --- Rating (rate-card index + buffer + applyRates) -------------------------
 export { buildRateCard } from "./rating/rateCardIndex.js";
@@ -101,6 +107,11 @@ export { applyRates } from "./rating/applyRates.js";
 
 // --- Invoicing --------------------------------------------------------------
 export { buildInvoices } from "./invoicing/buildInvoices.js";
+
+// --- Invoice-driven close (docs/AUGUST_CLOSE_PLAN.md) ------------------------
+export { closeFromInvoice, classifyInvoiceSku } from "./close/invoiceClose.js";
+export type { CloseOptions, CloseReport, CloseReportLine, CloseResult } from "./close/invoiceClose.js";
+export { allocateInteger, allocateCents } from "./lib/allocate.js";
 
 // --- Reconciliation (checks + August acceptance test) -----------------------
 export { runChecks } from "./reconcile/checks.js";

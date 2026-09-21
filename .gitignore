@@ -26,3 +26,10 @@ data/_transcript_extracted.txt
 
 # Generated pipeline output (invoices, reports) — never source; regenerate from data/
 out/
+
+# Real monthly Coro source packets — proprietary customer/financial data, NEVER commit.
+# (The Sep 11 call transcript .docx is already tracked and intentionally kept.)
+data/**/*.xlsx
+data/**/*.xls
+data/**/*.pdf
+data/2026-*/

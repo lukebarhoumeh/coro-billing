@@ -37,6 +37,8 @@ import {
   parseLinditaWorkbook,
   parseMsrp,
   parseCoroInvoice,
+  reduceUsage,
+  closeFromInvoice,
   buildRateCard,
   applyRates,
   buildInvoices,
@@ -48,6 +50,7 @@ import {
   isOk,
   Money,
 } from "../index.js";
+import type { CloseReport } from "../index.js";
 import type {
   CoroInvoiceLine,
   DiscrepancyReport,
@@ -442,6 +445,52 @@ function exportBillable(
   return heldFile ? { heldCount: held.length, outFile, heldFile } : { heldCount: held.length, outFile };
 }
 
+/** Print the invoice-driven close report (the recreate-vs-invoice tie-out). */
+function printCloseReport(report: CloseReport): void {
+  const w = (s: string) => process.stdout.write(s + "\n");
+  w(`\nInvoice-driven close — ${report.period} vs INVCUS2026-${report.invoiceNumber}:`);
+  w(
+    `  H tie: allocated $${report.allocatedH.toFixed2()} + out-of-period $${report.outOfPeriodH.toFixed2()}` +
+      ` = $${report.allocatedH.add(report.outOfPeriodH).toFixed2()} vs invoice total $${report.invoiceTotalH.toFixed2()}` +
+      ` — ${report.grandTieOk ? "TIES CENT-EXACT" : "DOES NOT TIE (do not bill)"}`
+  );
+  w(`  billable L (goes out to MSPs): $${report.billableL.toFixed2()}; held H (unresolved L): $${report.heldH.toFixed2()}`);
+
+  const ties = report.lines.filter((l) => l.qtyTies).length;
+  const withUsage = report.lines.filter((l) => l.usageQty !== null).length;
+  w(
+    `  lines: ${report.lines.length} partner×SKU (${withUsage} with usage detail, ` +
+      `${ties} qty-tie exactly, ${report.lines.filter((l) => l.held).length} held)`
+  );
+  for (const l of report.lines) {
+    const qty =
+      l.usageQty === null
+        ? `qty ${l.invoiceQty} (no usage detail)`
+        : l.qtyTies
+          ? `qty ${l.invoiceQty} ✓`
+          : `qty invoice ${l.invoiceQty} vs usage ${l.usageQty} ⚠`;
+    const money =
+      `H $${l.hTotal.toFixed2()}` +
+      (l.lTotal !== null ? `, L $${l.lTotal.toFixed2()}, margin $${l.margin!.toFixed2()}` : ", L UNRESOLVED — HELD");
+    const flags = l.flags.length > 0 ? `  [${l.flags.join("; ")}]` : "";
+    w(`    ${l.partner} / ${l.sku} (${l.skuClass}): ${qty}; ${money}${flags}`);
+  }
+
+  if (report.outOfPeriod.length > 0) {
+    w(`  out-of-period lines EXCLUDED from this close (still in the invoice total):`);
+    for (const o of report.outOfPeriod) {
+      w(
+        `    ${o.partner} / ${o.sku}: ${o.quantity} × → $${o.amount.toFixed2()} (${o.servicePeriod})` +
+          (o.note ? ` — "${o.note}"` : "")
+      );
+    }
+  }
+  if (report.usageOnly.length > 0) {
+    w(`  consumed per usage but NOT billed by Coro (raise with Coro; not billed to MSPs):`);
+    for (const u of report.usageOnly) w(`    ${u.partner} / ${u.sku}: usage qty ${u.usageQty}`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -549,6 +598,119 @@ program
     // Same honesty gate as `run`: never exit 0 with a failing check or a held line.
     if (failedChecks > 0 || heldCount > 0) process.exitCode = 1;
   });
+
+program
+  .command("close")
+  .description(
+    "invoice-driven monthly close: the Coro invoice IS the pricing authority (H = Subtotal, " +
+      "L = Client Price); usage breaks each line down by customer and flags disagreements. " +
+      "See docs/AUGUST_CLOSE_PLAN.md."
+  )
+  .requiredOption("--data <dir>", "directory holding the month's packet (usage + Coro invoices)")
+  .requiredOption("--month <YYYY-MM>", "accounting period, e.g. 2026-08")
+  .requiredOption("--invoice <number>", "the Coro invoice number that IS this month's close (e.g. 2193)")
+  .option("--out <dir>", "output directory", "out")
+  .option("--format <csv|iif>", "QuickBooks output format", "csv")
+  .option("--invoice-date <YYYY-MM-DD>", "invoice date stamped on every outbound invoice (default: today, UTC)")
+  .option("--due-date <YYYY-MM-DD>", "explicit due date (default: invoice date + 30-day terms)")
+  .action(
+    (opts: {
+      data: string;
+      month: string;
+      invoice: string;
+      out: string;
+      format: string;
+      invoiceDate?: string;
+      dueDate?: string;
+    }) => {
+      const format = opts.format.toLowerCase();
+      if (format !== "csv" && format !== "iif") {
+        process.stderr.write(`Unknown --format "${opts.format}". Use csv or iif.\n`);
+        process.exitCode = 1;
+        return;
+      }
+      const cfg = defaultConfig(opts.month);
+      const dataDir = resolve(opts.data);
+      const outDir = resolve(opts.out);
+      const files = xlsxFilesIn(dataDir);
+      const warnings: string[] = [];
+
+      // --- Usage → reduce (metric model → billed qty; partner slugs → invoice names) ---
+      let billed: ReturnType<typeof reduceUsage>["billed"] = [];
+      let reduceExceptions: ReturnType<typeof reduceUsage>["exceptions"] = [];
+      const usageFile = findFile(files, PATTERNS.usage);
+      if (!usageFile) {
+        warnings.push(
+          "usage file not found — the close will bill every invoice line partner-level " +
+            "(no by-customer breakdown). Dane wants the breakdown; drop the usage file in."
+        );
+      } else {
+        const r = parseUsage(workbookFrom(usageFile), { period: cfg.period });
+        if (isOk(r)) {
+          const reduced = reduceUsage(r.value);
+          billed = reduced.billed;
+          reduceExceptions = reduced.exceptions;
+        } else {
+          warnings.push(`failed to parse usage (${baseName(usageFile)}): ${r.error.message}`);
+        }
+      }
+
+      // --- Coro invoices (all of them; the close selects --invoice) ---
+      const coroInvoices: CoroInvoiceLine[] = [];
+      const invoiceFiles = findAll(files, PATTERNS.coroInvoice).filter(
+        (f) => !PATTERNS.usage.test(baseName(f)) && !PATTERNS.rateCard.test(baseName(f))
+      );
+      if (invoiceFiles.length === 0) {
+        process.stderr.write(
+          `No Coro invoice files found in ${dataDir} — the invoice IS the close; cannot continue.\n`
+        );
+        process.exitCode = 1;
+        return;
+      }
+      for (const f of invoiceFiles) {
+        const r = parseCoroInvoice(workbookFrom(f), {
+          invoiceNumber: invoiceNumberFromName(f),
+          period: cfg.period,
+        });
+        if (isOk(r)) coroInvoices.push(...r.value);
+        else warnings.push(`failed to parse Coro invoice (${baseName(f)}): ${r.error.message}`);
+      }
+      if (!coroInvoices.some((l) => l.invoiceNumber === opts.invoice)) {
+        process.stderr.write(
+          `No lines found for invoice "${opts.invoice}". Present: ` +
+            `${[...new Set(coroInvoices.map((l) => l.invoiceNumber))].join(", ") || "(none)"}.\n`
+        );
+        process.exitCode = 1;
+        return;
+      }
+
+      // --- The close ---
+      const { rated, exceptions, report } = closeFromInvoice(coroInvoices, billed, {
+        period: cfg.period,
+        invoiceNumber: opts.invoice,
+      });
+
+      printWarnings(warnings);
+      printCloseReport(report);
+      printExceptionSummary([...reduceExceptions, ...exceptions]);
+
+      // --- Export billable lines through the standard QuickBooks path ---
+      const invoiceDate = opts.invoiceDate ?? todayIso();
+      const shim: PricedClose = {
+        rated,
+        invoices: [],
+        exceptions,
+        packet: { usage: [], rateCardEntries: [], lindita: null, coroInvoices, warnings },
+      };
+      const { heldCount } = exportBillable(shim, cfg, outDir, format, {
+        invoiceDate,
+        dueDate: opts.dueDate,
+      });
+
+      // Honesty gate: a broken tie or held lines must never exit 0.
+      if (!report.grandTieOk || heldCount > 0) process.exitCode = 1;
+    }
+  );
 
 // Ensure Money is referenced so tree-shaking never drops the import used for
 // potential future totals in this boundary module (keeps the import intentional).

@@ -42,16 +42,31 @@ export interface ColumnMap {
   readonly [canonicalField: string]: readonly string[];
 }
 
-/** Coro monthly usage report (usage tab). */
+/**
+ * Coro monthly usage report (usage tab).
+ *
+ * Real-file headers (verified against `MSP Hub_August 2026 Usage.xlsx`, "Usage" tab):
+ * `# | Parent Workspace | Workspace | Type | Sub Type | Billing Mode | Region | Audit |
+ *  Product | Product Code | Metric | Quantity`. Notably:
+ *   - the partner is "Parent Workspace" (a slug like `amplivitycom_NE7N_b` — see
+ *     src/config/partners.ts for the slug→invoice-name map);
+ *   - "Billing Mode" (LEGACY | NEW) is the legacy signal — bool() already treats the
+ *     literal "legacy" as truthy, so it doubles as the legacyFlag;
+ *   - each (workspace, SKU) appears TWICE (Metric = Users | Devices); the billed
+ *     quantity is derived per the row's own "Audit" rule — see ingest/usageReduce.ts.
+ */
 export const USAGE_COLUMN_MAP: ColumnMap = {
-  partner: ["partner", "partner name", "reseller", "msp"],
+  partner: ["partner", "partner name", "reseller", "msp", "parent workspace"],
   customer: ["workspace", "child account", "customer", "account", "tenant"],
   sku: ["sku", "sku code", "item", "product code"],
   product: ["product", "product name"],
   quantity: ["quantity", "qty", "units", "seats", "count"],
   subtype: ["subtype", "sub type", "sub-type"],
-  legacyFlag: ["legacy", "is legacy", "legacy flag"],
+  legacyFlag: ["legacy", "is legacy", "legacy flag", "billing mode"],
   billingFlag: ["billing", "billing flag"],
+  metric: ["metric"],
+  audit: ["audit"],
+  wsType: ["type", "workspace type"],
   u: ["u"],
   d: ["d"],
 };
@@ -83,12 +98,32 @@ export const MSRP_COLUMN_MAP: ColumnMap = {
   listPrice: ["msrp", "list price", "list", "price"],
 };
 
+/**
+ * Coro → Hub invoice line items.
+ *
+ * Real-file headers (verified against `Coro_Invoice_INVCUS2026-0002193.xlsx`,
+ * "Invoice Detail" tab; the table sits below ~14 metadata rows and readSheet's
+ * header-row scoring finds it):
+ * `# | MSP Parent | Start Date | End Date | Item ID | Product Name | Quantity | Rate |
+ *  Discount | Subtotal | | Client Price | charge | margin | | Jul Qty | … | Note`.
+ *
+ * ⚠ Money semantics learned from the real 2193 file (docs/AUGUST_CLOSE_PLAN.md):
+ *   - "Rate" is DISPLAY-ROUNDED; "Subtotal" is computed on the unrounded net rate.
+ *     Subtotal (→ canonical `amount`) is the authoritative H total. Never bill Rate×Qty.
+ *   - "Client Price" (→ `clientPrice`) is the exact L unit; charge = Client Price × Qty.
+ */
 export const CORO_INVOICE_COLUMN_MAP: ColumnMap = {
-  sku: ["sku", "item", "product code", "description"],
-  partner: ["partner", "customer", "bill to"],
+  sku: ["sku", "item", "product code", "item id", "description"],
+  partner: ["partner", "customer", "bill to", "msp parent"],
   quantity: ["quantity", "qty", "units"],
   unitPrice: ["unit price", "rate", "price"],
-  amount: ["amount", "total", "line total", "ext price"],
+  amount: ["amount", "total", "line total", "ext price", "subtotal"],
+  clientPrice: ["client price"],
+  chargeAmount: ["charge"],
+  productName: ["product name"],
+  startDate: ["start date"],
+  endDate: ["end date"],
+  note: ["note", "notes"],
 };
 
 export interface PipelineConfig {

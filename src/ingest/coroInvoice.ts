@@ -54,6 +54,40 @@ const CUSTOMER_ALIASES: readonly string[] = [
   "end customer",
 ];
 
+/** Month-name → month-number map for the invoice's "Aug 1, 2026"-style date cells. */
+const MONTHS: Readonly<Record<string, number>> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
+/**
+ * Parse an invoice date cell into "YYYY-MM-DD". The real 2193 file stores dates as
+ * TEXT ("Aug 1, 2026"); a re-saved workbook may carry real Date objects (cellDates).
+ * Anything unparseable → null (the caller carries on without a service period —
+ * never guesses a date).
+ */
+export function parseDateCell(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const y = value.getUTCFullYear().toString().padStart(4, "0");
+    const m = (value.getUTCMonth() + 1).toString().padStart(2, "0");
+    const d = value.getUTCDate().toString().padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof value === "string") {
+    const m = /^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(value.trim());
+    if (m) {
+      const month = MONTHS[m[1]!.slice(0, 3).toLowerCase()];
+      if (month !== undefined) {
+        return `${m[3]}-${String(month).padStart(2, "0")}-${m[2]!.padStart(2, "0")}`;
+      }
+    }
+    // Already ISO?
+    const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  }
+  return null;
+}
+
 export function parseCoroInvoice(
   input: WorkbookInput,
   cfg?: { columns?: ColumnMap; invoiceNumber?: string; period?: Period }
@@ -78,6 +112,14 @@ export function parseCoroInvoice(
   const partnerHeader = resolveColumn(sheet.headers, columns.partner ?? []);
   const customerHeader = resolveColumn(sheet.headers, CUSTOMER_ALIASES);
   const invoiceNumberHeader = resolveColumn(sheet.headers, INVOICE_NUMBER_ALIASES);
+  // Real Invoice-Detail extras (docs/AUGUST_CLOSE_PLAN.md). All optional: invoice
+  // 1914's simpler layout has none of them, and synthetic fixtures neither.
+  const clientPriceHeader = resolveColumn(sheet.headers, columns.clientPrice ?? []);
+  const chargeAmountHeader = resolveColumn(sheet.headers, columns.chargeAmount ?? []);
+  const productNameHeader = resolveColumn(sheet.headers, columns.productName ?? []);
+  const startDateHeader = resolveColumn(sheet.headers, columns.startDate ?? []);
+  const endDateHeader = resolveColumn(sheet.headers, columns.endDate ?? []);
+  const noteHeader = resolveColumn(sheet.headers, columns.note ?? []);
 
   if (!skuHeader) {
     return err(
@@ -134,6 +176,26 @@ export function parseCoroInvoice(
     const partner = str(row, partnerHeader);
     const customer = str(row, customerHeader);
 
+    // Client Price (L unit): tri-state. Column absent → undefined; blank cell →
+    // null (L unresolved — the close HOLDS the line, never fabricates); value →
+    // exact Money. (docs/AUGUST_CLOSE_PLAN.md decision D2.)
+    const clientPriceNum = num(row, clientPriceHeader);
+    const clientPrice =
+      clientPriceHeader == null ? undefined : clientPriceNum == null ? null : Money.of(clientPriceNum);
+    const chargeNum = num(row, chargeAmountHeader);
+    const chargeAmount =
+      chargeAmountHeader == null ? undefined : chargeNum == null ? null : Money.of(chargeNum);
+
+    const productName = str(row, productNameHeader) ?? undefined;
+    const note = str(row, noteHeader) ?? undefined;
+
+    // Service window: parsed from the raw cells (dates may be text or Date objects).
+    const startDate = startDateHeader != null ? parseDateCell(row[startDateHeader]) : null;
+    const endDate = endDateHeader != null ? parseDateCell(row[endDateHeader]) : null;
+    // The line's service month, derived from the start date — this is what lets the
+    // close exclude 2193's "Jul period billed again" Rocker lines from August.
+    const servicePeriod = startDate != null ? startDate.slice(0, 7) : null;
+
     const line: CoroInvoiceLine = {
       invoiceNumber: rowInvoiceNumber,
       lineNumber,
@@ -146,6 +208,13 @@ export function parseCoroInvoice(
       ...(partner != null ? { partner } : {}),
       ...(customerHeader != null ? { customer } : {}),
       ...(cfg?.period != null ? { period: cfg.period } : {}),
+      ...(clientPrice !== undefined ? { clientPrice } : {}),
+      ...(chargeAmount !== undefined ? { chargeAmount } : {}),
+      ...(productName !== undefined ? { productName } : {}),
+      ...(startDate != null ? { startDate } : {}),
+      ...(endDate != null ? { endDate } : {}),
+      ...(servicePeriod != null ? { servicePeriod } : {}),
+      ...(note !== undefined ? { note } : {}),
     };
 
     lines.push(line);

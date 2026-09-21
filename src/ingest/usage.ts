@@ -91,6 +91,9 @@ export function parseUsage(
   const hSubtype = resolveColumn(sheet.headers, columns.subtype ?? []);
   const hQuantity = resolveColumn(sheet.headers, columns.quantity ?? []);
   const hLegacy = resolveColumn(sheet.headers, columns.legacyFlag ?? []);
+  const hMetric = resolveColumn(sheet.headers, columns.metric ?? []);
+  const hAudit = resolveColumn(sheet.headers, columns.audit ?? []);
+  const hWsType = resolveColumn(sheet.headers, columns.wsType ?? []);
   const hU = resolveColumn(sheet.headers, columns.u ?? []);
   const hD = resolveColumn(sheet.headers, columns.d ?? []);
 
@@ -135,6 +138,12 @@ export function parseUsage(
 
     const subtype = str(row, hSubtype) ?? undefined;
 
+    // Real-file metric model (Users/Devices rows + Coro's own Audit rule string).
+    // Carried verbatim; the reduction to a billed quantity lives in usageReduce.ts.
+    const metric = str(row, hMetric) ?? undefined;
+    const audit = str(row, hAudit) ?? undefined;
+    const wsType = str(row, hWsType) ?? undefined;
+
     // U and D: carried raw, meaning UNKNOWN, never interpreted.
     const u = unknownField(row, hU);
     const d = unknownField(row, hD);
@@ -147,6 +156,9 @@ export function parseUsage(
       quantity,
       ...(subtype !== undefined ? { subtype } : {}),
       ...(product !== undefined ? { product } : {}),
+      ...(metric !== undefined ? { metric } : {}),
+      ...(audit !== undefined ? { audit } : {}),
+      ...(wsType !== undefined ? { wsType } : {}),
       u,
       d,
       raw: { ...row }, // full row object for traceability back to the source file
