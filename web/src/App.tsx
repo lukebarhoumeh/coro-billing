@@ -1,113 +1,131 @@
-import { useMemo, useState } from "react";
-import type { ComponentType } from "react";
+/**
+ * MSP Hub — Coro Billing workbench shell.
+ *
+ * Six screens over one CloseModel: Intake (drop the month's files) → Overview →
+ * Rate Cards → Reconcile → Invoices (the payoff: per-MSP drafts the account
+ * team approves) → Exceptions. All state lives in closeStore; screens are
+ * presentational. The SYNTHETIC banner renders ONLY in demo mode — real files
+ * never show it.
+ */
+import { useMemo, useState, type ComponentType } from "react";
 import {
+  Inbox,
   LayoutDashboard,
-  FileText,
+  BadgeDollarSign,
   Scale,
+  FileText,
   TriangleAlert,
   ShieldAlert,
 } from "lucide-react";
-import { runDemo, DATASETS, BANNER, type DatasetKey, type DemoResult } from "@/lib/pipeline";
+import { useClose, SYNTHETIC_BANNER } from "@/lib/closeStore";
+import type { ScreenProps, SectionKey } from "@/lib/nav";
 import { cn } from "@/lib/cn";
+import { IntakeScreen } from "@/screens/Intake";
 import { OverviewScreen } from "@/screens/Overview";
-import { InvoicesScreen } from "@/screens/Invoices";
+import { RateCardsScreen } from "@/screens/RateCards";
 import { ReconcileScreen } from "@/screens/Reconcile";
+import { InvoicesScreen } from "@/screens/Invoices";
 import { ExceptionsScreen } from "@/screens/Exceptions";
-
-/**
- * MSP Hub — Coro Billing dashboard shell.
- *
- * Runs the REAL pipeline in-browser (via runDemo) over loudly-labeled SYNTHETIC
- * fixtures. This file is the frame: a persistent synthetic banner, a left rail
- * navigating the four screens, a header with the dataset switcher, and a footer.
- * All numbers live in DemoResult; each screen is purely presentational.
- */
-
-type SectionKey = "overview" | "invoices" | "reconcile" | "exceptions";
 
 interface Section {
   readonly key: SectionKey;
   readonly label: string;
   readonly icon: ComponentType<{ className?: string }>;
-  readonly Screen: ComponentType<{ result: DemoResult }>;
-  /** Optional live count badge in the nav (e.g. exceptions needing review). */
-  readonly count?: (r: DemoResult) => number;
+  readonly Screen: ComponentType<ScreenProps>;
+  readonly needsModel: boolean;
 }
 
 const SECTIONS: readonly Section[] = [
-  { key: "overview", label: "Overview", icon: LayoutDashboard, Screen: OverviewScreen },
-  { key: "invoices", label: "Invoices", icon: FileText, Screen: InvoicesScreen },
-  { key: "reconcile", label: "Reconcile", icon: Scale, Screen: ReconcileScreen },
-  {
-    key: "exceptions",
-    label: "Exceptions",
-    icon: TriangleAlert,
-    Screen: ExceptionsScreen,
-    count: (r) => r.exceptions.length,
-  },
+  { key: "intake", label: "Intake", icon: Inbox, Screen: IntakeScreen, needsModel: false },
+  { key: "overview", label: "Overview", icon: LayoutDashboard, Screen: OverviewScreen, needsModel: true },
+  { key: "ratecards", label: "Rate Cards", icon: BadgeDollarSign, Screen: RateCardsScreen, needsModel: true },
+  { key: "reconcile", label: "Reconcile", icon: Scale, Screen: ReconcileScreen, needsModel: true },
+  { key: "invoices", label: "Invoices", icon: FileText, Screen: InvoicesScreen, needsModel: true },
+  { key: "exceptions", label: "Exceptions", icon: TriangleAlert, Screen: ExceptionsScreen, needsModel: true },
 ];
 
-export default function App() {
-  const [dataset, setDataset] = useState<DatasetKey>("consistent");
-  const [section, setSection] = useState<SectionKey>("overview");
+function FileChip({ label, loaded }: { label: string; loaded: string | undefined }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-44 items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-xs",
+        loaded
+          ? "border-success/40 bg-success/10 text-success"
+          : "border-border bg-muted/40 text-muted-foreground"
+      )}
+      title={loaded ?? `${label} not loaded`}
+    >
+      <span
+        className={cn("h-1.5 w-1.5 shrink-0 rounded-full", loaded ? "bg-success" : "bg-muted-foreground/50")}
+      />
+      <span className="truncate">{loaded ?? label}</span>
+    </span>
+  );
+}
 
-  const result = useMemo(() => runDemo(dataset), [dataset]);
+export default function App() {
+  const store = useClose();
+  const [section, setSection] = useState<SectionKey>("intake");
+  const [context, setContext] = useState<string | undefined>(undefined);
+
+  const onNavigate = (next: SectionKey, ctx?: string) => {
+    setSection(next);
+    setContext(ctx);
+  };
+
+  const badges = useMemo(() => {
+    const m = store.model;
+    if (!m) return { exceptions: 0, invoices: 0 };
+    const unreviewed = m.partners.filter((p) => store.review[p.slug] === undefined).length;
+    return { exceptions: m.findings.length, invoices: unreviewed };
+  }, [store.model, store.review]);
 
   const active = SECTIONS.find((s) => s.key === section) ?? SECTIONS[0]!;
   const ActiveScreen = active.Screen;
-  const meta = DATASETS.find((d) => d.key === dataset) ?? DATASETS[0]!;
 
   return (
     <div className="flex min-h-full flex-col bg-background text-foreground">
-      {/* Persistent SYNTHETIC banner — never presented as a real close. */}
-      <div className="flex items-center justify-center gap-2 bg-warning px-4 py-1.5 text-center text-xs font-semibold text-warning-foreground">
-        <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-        <span>{BANNER} — figures are illustrative, not a real Coro close.</span>
-      </div>
+      {store.demo && (
+        <div className="flex items-center justify-center gap-2 bg-warning px-4 py-1.5 text-center text-xs font-semibold text-warning-foreground">
+          <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+          <span>{SYNTHETIC_BANNER} — figures are illustrative, not a real Coro close.</span>
+        </div>
+      )}
 
       <div className="flex flex-1 flex-col lg:flex-row">
-        {/* Left rail. */}
-        <aside className="shrink-0 border-b border-border bg-card/40 lg:w-64 lg:border-b-0 lg:border-r">
-          <div className="flex items-center gap-2.5 px-5 py-5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
-              <Scale className="h-5 w-5" />
-            </div>
-            <div className="leading-tight">
-              <div className="text-sm font-semibold">MSP Hub</div>
-              <div className="text-xs text-muted-foreground">Coro Billing</div>
-            </div>
+        {/* Left rail */}
+        <aside className="shrink-0 border-b border-border bg-card/40 lg:w-60 lg:border-b-0 lg:border-r">
+          <div className="px-5 pb-2 pt-5">
+            <div className="text-sm font-semibold tracking-tight">MSP Hub · Coro Billing</div>
+            <div className="text-xs text-muted-foreground">rate-card close workbench</div>
           </div>
-
-          <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible lg:pb-4">
+          <nav className="flex gap-1 overflow-x-auto p-3 lg:flex-col">
             {SECTIONS.map((s) => {
-              const Icon = s.icon;
-              const isActive = s.key === section;
-              const count = s.count?.(result) ?? 0;
+              const disabled = s.needsModel && store.model === null;
+              const count =
+                s.key === "exceptions"
+                  ? badges.exceptions
+                  : s.key === "invoices"
+                    ? badges.invoices
+                    : 0;
               return (
                 <button
                   key={s.key}
-                  type="button"
-                  onClick={() => setSection(s.key)}
-                  aria-current={isActive ? "page" : undefined}
+                  data-testid={`nav-${s.key}`}
+                  disabled={disabled}
+                  onClick={() => onNavigate(s.key)}
                   className={cn(
-                    "group flex items-center gap-3 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isActive
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    "flex items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors",
+                    section === s.key
+                      ? "bg-primary/15 font-medium text-primary"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                    disabled && "opacity-40"
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1 text-left">{s.label}</span>
+                  <s.icon className="h-4 w-4 shrink-0" />
+                  {s.label}
                   {count > 0 && (
-                    <span
-                      className={cn(
-                        "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular",
-                        isActive
-                          ? "bg-primary/20 text-primary"
-                          : "bg-warning/15 text-warning"
-                      )}
-                    >
+                    <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-xs tabular">
                       {count}
                     </span>
                   )}
@@ -115,90 +133,39 @@ export default function App() {
               );
             })}
           </nav>
-
-          <div className="hidden px-5 pb-5 lg:block">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              The automated version of Lindita&apos;s manual workbook — usage in, H &amp; L
-              applied, QuickBooks out.
-            </p>
-          </div>
         </aside>
 
-        {/* Main column. */}
+        {/* Main column */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Header. */}
-          <header className="border-b border-border px-6 py-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <h1 className="text-lg font-semibold tracking-tight">MSP Hub — Coro Billing</h1>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  Internal accounting close ·{" "}
-                  <span className="tabular text-foreground">{result.period}</span>
-                </p>
-              </div>
-
-              {/* Dataset switcher — segmented control over DATASETS. */}
-              <div className="shrink-0">
-                <div className="inline-flex items-center rounded-lg border border-border bg-card p-1">
-                  {DATASETS.map((d) => {
-                    const isActive = d.key === dataset;
-                    return (
-                      <button
-                        key={d.key}
-                        type="button"
-                        onClick={() => setDataset(d.key)}
-                        aria-pressed={isActive}
-                        className={cn(
-                          "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          isActive
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {d.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mt-2 max-w-md text-xs leading-relaxed text-muted-foreground lg:text-right">
-                  {meta.blurb}
-                </p>
-              </div>
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
+            <div className="text-sm">
+              <span className="font-medium">{store.period}</span>
+              <span className="text-muted-foreground"> close</span>
             </div>
-
-            {/* Ingest error banner (should be none for synthetic fixtures). */}
-            {result.ingestErrors.length > 0 && (
-              <div className="mt-4 rounded-lg border border-danger/40 bg-danger/10 p-4">
-                <div className="flex items-start gap-2.5">
-                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
-                  <div className="space-y-1">
-                    <div className="text-sm font-semibold text-danger">
-                      Ingest errors — the close cannot be trusted
-                    </div>
-                    <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
-                      {result.ingestErrors.map((err, i) => (
-                        <li key={i}>{err}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <FileChip label="pricing" loaded={store.files.pricing?.fileName} />
+              <FileChip label="usage" loaded={store.files.usage?.fileName} />
+              <FileChip label="invoice" loaded={store.files.invoice?.fileName} />
+            </div>
           </header>
 
-          {/* Active screen. */}
-          <main className="flex-1 px-6 py-6">
-            <ActiveScreen result={result} />
+          <main className="flex-1 overflow-auto p-6">
+            {active.needsModel && store.model === null ? (
+              <div className="mx-auto mt-16 max-w-md text-center text-sm text-muted-foreground">
+                <p className="mb-3">Drop the month's files first — the close builds itself.</p>
+                <button className="text-primary underline" onClick={() => onNavigate("intake")}>
+                  Go to intake
+                </button>
+              </div>
+            ) : (
+              <ActiveScreen onNavigate={onNavigate} context={context} />
+            )}
           </main>
 
-          {/* Footer. */}
-          <footer className="border-t border-border px-6 py-4">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Runs the real pipeline in-browser over synthetic fixtures ·{" "}
-              <span className="text-foreground/70">H (our cost) stays internal</span> ·
-              QuickBooks is the system of record.
-            </p>
+          <footer className="border-t border-border px-6 py-2 text-xs text-muted-foreground">
+            All parsing and pricing runs in your browser — files never leave this machine. Every
+            number traces to a source row or a written Coro rate; anything unpriceable is HELD, never
+            invented.
           </footer>
         </div>
       </div>
