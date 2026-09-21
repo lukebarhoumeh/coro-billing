@@ -68,7 +68,9 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
     const totalHExpected = model.partners.reduce((s, p) => s + p.totalHExpected.toNumber(), 0);
     const totalMargin = model.partners.reduce((s, p) => s + p.totalMargin.toNumber(), 0);
     expect(totalL.toFixed(2)).toBe("13376.40");
-    expect(totalHActual.toFixed(2)).toBe("12286.13");
+    // 12,492.38 = 12,286.13 + AVOX's 2193 line ($206.25), which attaches since
+    // the vaimancom → "AVOX LLC" map fix (2026-09-21).
+    expect(totalHActual.toFixed(2)).toBe("12492.38");
     expect(totalHExpected.toFixed(2)).toBe("11697.87");
     expect(totalMargin.toFixed(2)).toBe("884.02");
   });
@@ -120,7 +122,8 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
       PRODUCT_FALLBACK: 3,
       NFR_LINE: 1,
       OUT_OF_PERIOD_LINE: 2, // the two July Rocker lines on invoice 2193
-      NO_USAGE_BREAKDOWN: 1,
+      // NO_USAGE_BREAKDOWN gone: the "AVOX LLC" invoice line was always backed
+      // by vaimancom usage — the curated map just called it "Vaiman" (fixed).
     });
   });
 

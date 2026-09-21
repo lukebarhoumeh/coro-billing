@@ -11,9 +11,14 @@
  * An unmapped slug is returned cleaned-but-unmapped and the caller must surface an
  * UNMAPPED_PARTNER exception — the close never silently invents a partner identity.
  *
- * Hurricane IT and Vaiman are mapped even though they have no line on invoice 2193:
- * they appear in August usage (consumed but unbilled — a real finding the close
- * reports as USAGE_NOT_ON_INVOICE).
+ * Hurricane IT is mapped even though it has no line on invoice 2193: it appears
+ * in August usage (NFR — consumed but unbilled, surfaced as USAGE_NOT_ON_INVOICE).
+ *
+ * vaimancom → "AVOX LLC": invoice 2193 bills this workspace's consumption under
+ * "AVOX LLC" (the special-pricing sheet calls the partner "Avox"). The map's
+ * original "Vaiman" guess made 2193's AVOX line look like it had no usage —
+ * corrected 2026-09-21 (the "Vaiman consumed-but-unbilled" finding was a naming
+ * artifact, not a real gap).
  */
 
 /** `amplivitycom_NE7N_b` → `amplivitycom`. The `_XXXX_b` suffix is Coro's workspace id. */
@@ -39,7 +44,7 @@ export const PARTNER_SLUG_MAP: Readonly<Record<string, string>> = {
   rockerio: "Rocker",
   techlpcom: "Techlead Professional Services LLC",
   teledatauscom: "Teledata Cloud Services",
-  vaimancom: "Vaiman",
+  vaimancom: "AVOX LLC",
   viener4gatescom: "Viener4Gates",
   xtbsolutionscom: "XTB Solutions",
 };

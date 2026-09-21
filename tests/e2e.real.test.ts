@@ -86,11 +86,10 @@ describe.skipIf(!hasRealData)("August 2026 close — real packet", () => {
   it("ties usage to the invoice on all 48 lines that have usage detail", () => {
     const { report } = runClose();
     expect(report.lines).toHaveLength(49);
-    expect(report.lines.filter((l) => l.usageQty !== null)).toHaveLength(48);
-    expect(report.lines.filter((l) => l.qtyTies)).toHaveLength(48);
-    // The single no-usage-detail line is AVOX (invoice-only partner).
-    const avox = report.lines.find((l) => l.usageQty === null);
-    expect(avox?.partner).toBe("AVOX LLC");
+    // Every invoice line ties to usage now — the "AVOX no-usage" gap was a map
+    // artifact (vaimancom is billed as "AVOX LLC"; fixed 2026-09-21).
+    expect(report.lines.filter((l) => l.usageQty !== null)).toHaveLength(49);
+    expect(report.lines.filter((l) => l.qtyTies)).toHaveLength(49);
     expect(report.lines.filter((l) => l.held)).toHaveLength(0);
   });
 
@@ -102,15 +101,16 @@ describe.skipIf(!hasRealData)("August 2026 close — real packet", () => {
     expect(report.outOfPeriod.every((o) => /Jul period billed again/.test(o.note ?? ""))).toBe(true);
   });
 
-  it("surfaces consumed-but-unbilled usage (the Vaiman finding) without billing it", () => {
+  it("surfaces consumed-but-unbilled usage without billing it", () => {
+    // The former third entry ("Vaiman"/BUCOROflex 50) was a naming artifact:
+    // invoice 2193 bills that workspace as "AVOX LLC" (fixed 2026-09-21). The
+    // remaining two are genuine zero-qty/NFR consumption.
     const { report, rated } = runClose();
     expect(report.usageOnly).toEqual([
       { partner: "Hurricane IT", sku: "COR-COMP-NFR", usageQty: 0 },
       { partner: "Techlead Professional Services LLC", sku: "ADDMDRflex", usageQty: 0 },
-      { partner: "Vaiman", sku: "BUCOROflex", usageQty: 50 },
     ]);
-    // None of them billed.
-    expect(rated.some((r) => r.partner === "Vaiman" || r.partner === "Hurricane IT")).toBe(false);
+    expect(rated.some((r) => r.partner === "Hurricane IT")).toBe(false);
   });
 
   it("flags the five negative-margin lines (selling below Coro cost)", () => {
