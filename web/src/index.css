@@ -47,3 +47,60 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* ------------------------------------------------------------------------- *
+ * Print stylesheet — only the invoice document (.print-invoice, rendered by
+ * the Invoices screen) is printed. Visibility technique: hide everything,
+ * re-show the invoice subtree, and lift it to the top-left of the page. The
+ * dark theme is forced to paper colors (white background, near-black text,
+ * light borders). Tailwind's own `print:hidden` utilities still apply on top
+ * of this — they are display-based and are NOT redefined here.
+ * ------------------------------------------------------------------------- */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-invoice,
+  .print-invoice * {
+    visibility: visible;
+  }
+  .print-invoice {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff !important;
+    color: #111 !important;
+    border: none !important;
+    border-radius: 0;
+    box-shadow: none !important;
+    padding: 0;
+  }
+  .print-invoice * {
+    background: transparent !important;
+    color: #111 !important;
+    border-color: #ddd !important;
+    box-shadow: none !important;
+    /* The Table primitive wraps tables in an overflow-auto div; scroll
+     * containers can clip page-spanning content when printing. */
+    overflow: visible !important;
+  }
+  /* The app shell scrolls; let the document flow across pages when printing. */
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  main {
+    overflow: visible !important;
+  }
+  .print-invoice tr {
+    page-break-inside: avoid;
+  }
+}
+
+/* US Letter with comfortable margins. */
+@page {
+  margin: 0.75in;
+}

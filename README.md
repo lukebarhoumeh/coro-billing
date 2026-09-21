@@ -374,6 +374,62 @@ columns + rule→transcript traceability), [`docs/QUICKBOOKS.md`](docs/QUICKBOOK
 
 ---
 
+## The rate-card close (Sep 2026) — the workbench the account team uses
+
+The missing piece landed. On **September 18, 2026** Danny Gaston walked Luke through
+**`Coro Special MSP Pricing(Special Pricing).csv`** — Coro's per-partner rate card
+(42 partners, ~293 rate rows, one block per partner keyed by **Workspace ID**):
+
+> This is the partner, this is their workspace. Here are all of the products they're
+> buying or might be buying. Here's the list price for those products. That should be
+> the same in every single one. Then here is the price that partner is buying those
+> products for.
+
+Semantics locked with Luke (2026-09-21), spec in
+[`docs/superpowers/specs/2026-09-21-coro-billing-ui-revamp-design.md`](docs/superpowers/specs/2026-09-21-coro-billing-ui-revamp-design.md):
+
+- **Column E "Net Price to MSP" = L**, the partner's cost — what the MSP pays Hub.
+  Read, never derived.
+- **Hub's cost carries BOTH rules**, because they demonstrably disagree: the sheet's
+  col H is `E × 0.95`, but Coro's real invoices stack the discounts **additively off
+  list** (Seven Star 58%+5% ⇒ 15 × 0.37 = **$5.55**, not $6.08). When a Coro invoice
+  is loaded its Subtotal is the authoritative actual cost; deltas are findings.
+- **`MOD*` product codes = Modules Flex** (usage says "NETWORK", code `MODNETWflex`
+  → the partner's Modules Flex rate). A partner's product-specific flex row
+  ("Network Flex") beats the generic rate; `Modsatflex` → "SAT Flex" where present;
+  `ADD*` maps through the modules chain flagged **assumed**; `*-NFR` never bills.
+- **Quantities come from the usage report's own `Audit` strings** (the re-exported
+  file zeroes the per-row Quantity column; the audit string is stable and states
+  Coro's billed figure + rule).
+
+The close (`src/close/rateCardClose.ts`) drafts **one invoice per MSP** — L on
+audit quantities, cost under both rules, per-customer breakdown, Coro-invoice
+cross-check — and the **August packet is pinned end-to-end**
+(`tests/e2e.rateCardClose.real.test.ts`): 16/16 workspaces join the card,
+**$13,376.40 drafted vs $12,286.13 actual Coro cost (margin $884.02)**, Rocker ties
+invoice 2193 to the cent, two honest HELD lines, four margin-negative partners
+surfaced.
+
+**The web workbench** (`web/`) is the account team's front end:
+
+```bash
+pnpm --dir web dev        # then open http://localhost:5173
+pnpm --dir web build      # static site — deployable anywhere; no server, no data in the build
+```
+
+Drop the month's three files on **Intake** (special pricing CSV, usage XLSX,
+optionally the Coro invoice XLSX — parsed **entirely in the browser**, bytes never
+leave the machine) → **Overview** (billed / cost under both rules / margin) →
+**Rate Cards** (every partner's card with sheet-math flags + Danny's list-price
+check) → **Reconcile** (card ↔ usage ↔ invoice three-way match) → **Invoices**
+(per-MSP drafts: **Approve / Needs review + note**, persisted per month+file
+fingerprint; print/PDF per MSP) → **Exceptions**. Exports: **Excel close workbook**
+(Lindita-shaped tabs + findings + review trail) and **QuickBooks CSV / IIF**, gated
+on approval. A **Load demo data** button walks the whole flow on loudly-labeled
+synthetic fixtures — the SYNTHETIC banner appears only there.
+
+---
+
 ## What happens next
 
 Status of the build (against the spec above):
@@ -383,8 +439,8 @@ Status of the build (against the spec above):
 3. ✅ Recreate the month and diff against Lindita (`reconcile`) — the acceptance gate, proven cent-exact on synthetic fixtures.
 4. ✅ QuickBooks **export** (QBO import CSV + Desktop IIF); a documented QBO-API adapter is scaffolded (stub, not wired).
 5. ✅ **The real August 2026 close** (2026-09-15): packet in `data/2026-08/` (git-ignored), invoice-driven `close` command ties **$13,151.64 cent-exact**, 48/48 usage-qty ties, 15 outbound MSP invoices ($15,611.06), real findings surfaced (July double-billing on 2193, Vaiman consumed-but-unbilled, 5 negative-margin lines). See `docs/AUGUST_CLOSE_PLAN.md`.
-6. ⏳ **Jack's special pricing** (`Coro Special MSP Pricing.xlsx`) — only a SharePoint shortcut came through; once downloaded, the rate-card path validates the invoice's H/L per partner.
-7. ⏳ A small internal web UI for month-end exceptions (sits on top of this pipeline; does not replace it).
+6. ✅ **Jack's special pricing landed** (2026-09-18, CSV): `src/ingest/specialPricing.ts` + `src/config/productMap.ts` + `src/close/rateCardClose.ts` — the rate-card close drafts per-MSP invoices and uses the Coro invoice as the cost cross-check (see "The rate-card close" above).
+7. ✅ **The web workbench** (`web/`): drag-drop intake, six screens, approve/flag review, print/Excel/QuickBooks exports — the account team's month-end front end.
 
 Nothing here guesses a rate. The August close bills only what Coro invoiced — every
 disagreement between usage and the invoice is surfaced, never silently reconciled.
