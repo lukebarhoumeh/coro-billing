@@ -1,13 +1,15 @@
 /**
  * Exceptions — every finding of the close, grouped by severity (block → warn →
- * info). Each row can jump to the screen where the finding is actionable,
- * carrying the partner's workspace slug when the name resolves to a draft.
- * Info findings start collapsed — real months carry 40+.
+ * info), run as a burn-down list: each row carries an acknowledge checkbox so
+ * the accounting team can record that a human saw it (it changes no number).
+ * Each row can jump to the screen where the finding is actionable, carrying
+ * the partner's workspace slug when the name resolves to a draft. Info
+ * findings start collapsed — real months carry 40+.
  */
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, EyeOff } from "lucide-react";
 import type { Exception, ExceptionKind } from "@pipeline/domain/types.js";
-import { useClose } from "@/lib/closeStore";
+import { useClose, findingKey } from "@/lib/closeStore";
 import type { ScreenProps, SectionKey } from "@/lib/nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, severityVariant } from "@/components/ui/badge";
@@ -70,15 +72,20 @@ function FindingsTable({
   findings,
   onNavigate,
   slugFor,
+  acked,
+  onToggleAck,
 }: {
   findings: readonly Exception[];
   onNavigate: ScreenProps["onNavigate"];
   slugFor: (partner: string) => string | undefined;
+  acked: ReadonlySet<string>;
+  onToggleAck: (key: string) => void;
 }) {
   return (
     <Table>
       <THead>
         <TR>
+          <TH className="w-10">Ack</TH>
           <TH>Severity</TH>
           <TH>Kind</TH>
           <TH>Partner</TH>
@@ -88,57 +95,115 @@ function FindingsTable({
         </TR>
       </THead>
       <TBody>
-        {findings.map((f, i) => (
-          <TR key={`${f.kind}-${f.partner}-${f.sku}-${i}`}>
-            <TD>
-              <Badge variant={severityVariant(f.severity)}>{f.severity}</Badge>
-            </TD>
-            <TD className="whitespace-nowrap font-mono text-xs">{f.kind}</TD>
-            <TD className="whitespace-nowrap">
-              {f.partner !== "" ? f.partner : <span className="text-muted-foreground">—</span>}
-            </TD>
-            <TD className="whitespace-nowrap font-mono text-xs text-muted-foreground">
-              {f.sku !== "" ? f.sku : "—"}
-            </TD>
-            <TD className="break-words text-muted-foreground">{f.message}</TD>
-            <TD>
-              <Button
-                variant="ghost"
-                className="h-auto px-2 py-1 text-xs text-primary"
-                onClick={() =>
-                  onNavigate(SECTION_FOR_KIND[f.kind] ?? "reconcile", slugFor(f.partner))
-                }
-              >
-                view
-              </Button>
-            </TD>
-          </TR>
-        ))}
+        {findings.map((f) => {
+          const key = findingKey(f);
+          const isAcked = acked.has(key);
+          return (
+            <TR key={key} className={cn(isAcked && "opacity-60")}>
+              <TD>
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 cursor-pointer rounded border-border accent-primary"
+                  aria-label={`Acknowledge finding ${f.kind}`}
+                  checked={isAcked}
+                  onChange={() => onToggleAck(key)}
+                />
+              </TD>
+              <TD>
+                <Badge variant={severityVariant(f.severity)}>{f.severity}</Badge>
+              </TD>
+              <TD className="whitespace-nowrap font-mono text-xs">{f.kind}</TD>
+              <TD className="whitespace-nowrap">
+                {f.partner !== "" ? f.partner : <span className="text-muted-foreground">—</span>}
+              </TD>
+              <TD className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                {f.sku !== "" ? f.sku : "—"}
+              </TD>
+              <TD className={cn("break-words text-muted-foreground", isAcked && "line-through")}>
+                {f.message}
+              </TD>
+              <TD>
+                <Button
+                  variant="ghost"
+                  className="h-auto px-2 py-1 text-xs text-primary"
+                  onClick={() =>
+                    onNavigate(SECTION_FOR_KIND[f.kind] ?? "reconcile", slugFor(f.partner))
+                  }
+                >
+                  view
+                </Button>
+              </TD>
+            </TR>
+          );
+        })}
       </TBody>
     </Table>
   );
 }
 
 export function ExceptionsScreen({ onNavigate }: ScreenProps) {
-  const { model } = useClose();
+  const { model, acked, toggleAck } = useClose();
   const [showInfo, setShowInfo] = useState(false);
+  const [hideAcked, setHideAcked] = useState(false);
 
   if (model === null) return null;
 
-  const block = model.findings.filter((f) => f.severity === "block");
-  const warn = model.findings.filter((f) => f.severity === "warn");
-  const info = model.findings.filter((f) => f.severity === "info");
+  const ackedCount = model.findings.filter((f) => acked.has(findingKey(f))).length;
+  const total = model.findings.length;
+  const ackPct = total > 0 ? (ackedCount / total) * 100 : 0;
+
+  const visible = (items: readonly Exception[]): readonly Exception[] =>
+    hideAcked ? items.filter((f) => !acked.has(findingKey(f))) : items;
+
+  const block = visible(model.findings.filter((f) => f.severity === "block"));
+  const warn = visible(model.findings.filter((f) => f.severity === "warn"));
+  const info = visible(model.findings.filter((f) => f.severity === "info"));
   const slugFor = (partner: string): string | undefined =>
     model.partners.find((p) => p.cardName === partner)?.slug;
 
   return (
     <div className="space-y-6">
       <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
-        <h1 className="figure rule-brass text-2xl">Exceptions</h1>
-        <p className="pt-1 text-sm text-muted-foreground">
-          {model.findings.length} finding{model.findings.length === 1 ? "" : "s"} this close —
-          every anomaly the pipeline recorded, grouped by severity.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-2">
+            <h1 className="figure rule-brass text-2xl">Exceptions</h1>
+            <p className="pt-1 text-sm text-muted-foreground">
+              {total} finding{total === 1 ? "" : "s"} this close —
+              every anomaly the pipeline recorded, grouped by severity.
+            </p>
+          </div>
+          {total > 0 && (
+            <Button
+              variant="outline"
+              data-testid="toggle-acked"
+              aria-pressed={hideAcked}
+              className={cn(
+                "h-auto px-2.5 py-1.5 text-xs",
+                hideAcked && "border-primary/40 bg-primary/10 text-primary"
+              )}
+              onClick={() => setHideAcked((v) => !v)}
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+              Hide acknowledged
+            </Button>
+          )}
+        </div>
+        {total > 0 && (
+          <div className="max-w-sm space-y-1.5 pt-1" data-testid="ack-progress">
+            <div className="flex items-baseline gap-1.5">
+              <span className="microlabel">acknowledged</span>
+              <span className="figure text-sm">{ackedCount}</span>
+              <span className="text-xs text-muted-foreground">of</span>
+              <span className="figure text-sm">{total}</span>
+            </div>
+            <div className="h-1 overflow-hidden rounded-full bg-muted/60">
+              <div
+                className="h-full rounded-full bg-primary"
+                style={{ width: `${ackPct}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Severity summary — three stat chips */}
@@ -151,7 +216,7 @@ export function ExceptionsScreen({ onNavigate }: ScreenProps) {
         <SeverityStat severity="info" count={info.length} />
       </div>
 
-      {model.findings.length === 0 && (
+      {total === 0 && (
         <Card
           className="rise border-success/40"
           style={{ "--rise-i": 2 } as React.CSSProperties}
@@ -159,6 +224,18 @@ export function ExceptionsScreen({ onNavigate }: ScreenProps) {
           <CardContent className="flex items-center gap-2 p-5 text-sm text-success">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             No findings — a clean close.
+          </CardContent>
+        </Card>
+      )}
+
+      {total > 0 && hideAcked && block.length + warn.length + info.length === 0 && (
+        <Card
+          className="rise border-success/40"
+          style={{ "--rise-i": 2 } as React.CSSProperties}
+        >
+          <CardContent className="flex items-center gap-2 p-5 text-sm text-success">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            All {total} finding{total === 1 ? "" : "s"} acknowledged — burn-down complete.
           </CardContent>
         </Card>
       )}
@@ -179,7 +256,13 @@ export function ExceptionsScreen({ onNavigate }: ScreenProps) {
                 <Badge variant={severityVariant(sev)}>{items.length}</Badge>
               </CardHeader>
               <CardContent>
-                <FindingsTable findings={items} onNavigate={onNavigate} slugFor={slugFor} />
+                <FindingsTable
+                  findings={items}
+                  onNavigate={onNavigate}
+                  slugFor={slugFor}
+                  acked={acked}
+                  onToggleAck={toggleAck}
+                />
               </CardContent>
             </Card>
           )
@@ -213,7 +296,13 @@ export function ExceptionsScreen({ onNavigate }: ScreenProps) {
           </CardHeader>
           {showInfo && (
             <CardContent>
-              <FindingsTable findings={info} onNavigate={onNavigate} slugFor={slugFor} />
+              <FindingsTable
+                findings={info}
+                onNavigate={onNavigate}
+                slugFor={slugFor}
+                acked={acked}
+                onToggleAck={toggleAck}
+              />
             </CardContent>
           )}
         </Card>

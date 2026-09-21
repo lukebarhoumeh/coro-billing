@@ -11,9 +11,14 @@
  *
  * GP/GM language (MSP Hub): GP = the computed Money margin; GM = gmPct(GP,
  * billed L). Both are screen-only — the printed invoice never shows cost.
+ *
+ * The list is a review QUEUE: filter chips (All / Unreviewed / Flagged / Held /
+ * Approved — Held is orthogonal to status), one-click "Approve all clean" for
+ * drafts with nothing held and only info-level findings, and prev/next paging
+ * (buttons + arrow keys) through the CURRENTLY FILTERED order in the detail.
  */
-import { useState } from "react";
-import { CheckCircle2, ChevronRight, Flag, Printer } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCheck, CheckCircle2, ChevronRight, Flag, Printer } from "lucide-react";
 import type {
   DraftLine,
   Exception,
@@ -199,12 +204,20 @@ function InvoiceLineRow({ line }: { line: DraftLine }) {
   const [expanded, setExpanded] = useState(false);
   const nfr = line.matchKind === "nfr";
   const held = !nfr && line.unitL === null;
+  // Billable but nothing consumed — reviewer noise, so mute the whole row.
+  const zeroUsage = !nfr && !held && line.quantity === 0;
   const badges = anomalyLabels(line.findings);
   const marginNegative = line.margin !== null && line.margin.isNegative();
 
   return (
     <>
-      <TR className={cn(held && "bg-warning/10", nfr && "text-muted-foreground")}>
+      <TR
+        className={cn(
+          held && "bg-warning/10",
+          nfr && "text-muted-foreground",
+          zeroUsage && "text-muted-foreground opacity-60"
+        )}
+      >
         <TD>
           <div className={cn(!nfr && "font-medium")}>{line.productLabel}</div>
           <div className="font-mono text-xs text-muted-foreground">{line.vendorSku}</div>
@@ -256,7 +269,12 @@ function InvoiceLineRow({ line }: { line: DraftLine }) {
                 )?.message ?? "no rate on the card"}
               </div>
               <div className="text-xs">excluded from total</div>
+              <div className="text-xs text-muted-foreground print:hidden">
+                Fix: ask Coro billing to add this product to the partner's special pricing sheet.
+              </div>
             </div>
+          ) : zeroUsage ? (
+            <span className="text-xs">no usage this month</span>
           ) : line.amountL !== null ? (
             money(line.amountL)
           ) : (
@@ -311,23 +329,56 @@ function InvoiceLineRow({ line }: { line: DraftLine }) {
 
 /* ---------------------------- detail view -------------------------------- */
 
-function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
+function InvoiceDetail({ draft, entry, setReview, period, demo, onBack, position, onPrev, onNext }: {
   draft: PartnerDraft;
   entry: ReviewEntry | undefined;
   setReview: (slug: string, entry: ReviewEntry | null) => void;
   period: Period;
   demo: boolean;
   onBack: () => void;
+  /** Place in the CURRENTLY FILTERED queue: at is -1 when filtered out. */
+  position: { readonly at: number; readonly of: number };
+  onPrev: () => void;
+  onNext: () => void;
 }) {
   const { contactName, contactEmail, address } = draft.contact;
   const negative = draft.totalMargin.isNegative();
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
-      <div className="rise print:hidden" style={{ "--rise-i": 0 } as React.CSSProperties}>
+      <div
+        className="rise flex flex-wrap items-center justify-between gap-2 print:hidden"
+        style={{ "--rise-i": 0 } as React.CSSProperties}
+      >
         <Button variant="ghost" data-testid="invoice-back" onClick={onBack}>
           ← All invoices
         </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            data-testid="invoice-prev"
+            aria-label="Previous draft"
+            title="Previous draft (←)"
+            disabled={position.of === 0}
+            onClick={onPrev}
+          >
+            ←
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            <span className="tabular">{position.at >= 0 ? position.at + 1 : "–"}</span> of{" "}
+            <span className="tabular">{position.of}</span>
+          </span>
+          <Button
+            variant="outline"
+            data-testid="invoice-next"
+            aria-label="Next draft"
+            title="Next draft (→)"
+            disabled={position.of === 0}
+            onClick={onNext}
+          >
+            →
+          </Button>
+        </div>
       </div>
 
       <ReviewToolbar key={draft.slug} slug={draft.slug} entry={entry} setReview={setReview} />
@@ -432,15 +483,100 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, onBack }: {
   );
 }
 
+/* ----------------------------- review queue ------------------------------ */
+
+type FilterKey = "all" | "unreviewed" | "flagged" | "held" | "approved";
+
+const FILTERS: readonly { key: FilterKey; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "unreviewed", label: "Unreviewed" },
+  { key: "flagged", label: "Flagged" },
+  { key: "held", label: "Held" },
+  { key: "approved", label: "Approved" },
+];
+
+/** Held is orthogonal to review status — a held draft shows there regardless. */
+function matchesFilter(
+  draft: PartnerDraft,
+  status: ReviewStatus | undefined,
+  filter: FilterKey
+): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "unreviewed":
+      return status === undefined;
+    case "flagged":
+      return status === "needs_review";
+    case "held":
+      return draft.heldLines > 0;
+    case "approved":
+      return status === "approved";
+  }
+}
+
+/** Qualifies for one-click approval: untouched, nothing held, and no line
+ * finding above info severity — the drafts that need no human judgment. */
+function isClean(draft: PartnerDraft, status: ReviewStatus | undefined): boolean {
+  return (
+    status === undefined &&
+    draft.heldLines === 0 &&
+    !draft.lines.some((l) =>
+      l.findings.some((f) => f.severity === "block" || f.severity === "warn")
+    )
+  );
+}
+
 /* ------------------------------ screen ----------------------------------- */
 
 export function InvoicesScreen({ context }: ScreenProps) {
-  const { model, review, setReview, period, demo } = useClose();
+  const { model, review, setReview, approveMany, period, demo } = useClose();
   const [selectedSlug, setSelectedSlug] = useState<string | null>(() =>
     context !== undefined && model !== null && model.partners.some((p) => p.slug === context)
       ? context
       : null
   );
+  const [filter, setFilter] = useState<FilterKey>("all");
+
+  const partners = model?.partners;
+
+  /** The queue: partners in model order, narrowed by the active chip. */
+  const filtered = useMemo(
+    () => (partners ?? []).filter((p) => matchesFilter(p, review[p.slug]?.status, filter)),
+    [partners, review, filter]
+  );
+
+  /** Step prev/next through the CURRENTLY FILTERED order, wrapping around. */
+  const step = useCallback(
+    (delta: 1 | -1) => {
+      setSelectedSlug((slug) => {
+        if (filtered.length === 0) return slug;
+        const at = slug === null ? -1 : filtered.findIndex((p) => p.slug === slug);
+        // Filtered out (e.g. just approved under the Unreviewed chip): next
+        // lands on the first queue item, prev on the last.
+        const base = at >= 0 ? at : delta === 1 ? -1 : 0;
+        return filtered[(base + delta + filtered.length) % filtered.length]!.slug;
+      });
+    },
+    [filtered]
+  );
+
+  // Arrow keys page the detail view. Events from the note textarea (or any
+  // input) are ignored so typing keeps its caret keys; cleaned up on unmount.
+  useEffect(() => {
+    if (selectedSlug === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      // Leave modifier combos alone — Alt+← is browser back, etc.
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const tag = e.target instanceof HTMLElement ? e.target.tagName : "";
+      if (tag === "TEXTAREA" || tag === "INPUT") return;
+      e.preventDefault();
+      step(e.key === "ArrowRight" ? 1 : -1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedSlug, step]);
 
   if (model === null) return null; // App gates on model; belt-and-braces
 
@@ -458,9 +594,39 @@ export function InvoicesScreen({ context }: ScreenProps) {
         period={period}
         demo={demo}
         onBack={() => setSelectedSlug(null)}
+        position={{ at: filtered.findIndex((p) => p.slug === selected.slug), of: filtered.length }}
+        onPrev={() => step(-1)}
+        onNext={() => step(1)}
       />
     );
   }
+
+  const counts: Record<FilterKey, number> = {
+    all: 0,
+    unreviewed: 0,
+    flagged: 0,
+    held: 0,
+    approved: 0,
+  };
+  for (const p of model.partners) {
+    counts.all += 1;
+    const status = review[p.slug]?.status;
+    if (status === undefined) counts.unreviewed += 1;
+    else if (status === "approved") counts.approved += 1;
+    else counts.flagged += 1;
+    if (p.heldLines > 0) counts.held += 1;
+  }
+
+  const clean = model.partners.filter((p) => isClean(p, review[p.slug]?.status));
+  const approveAllClean = () => {
+    if (clean.length === 0) return;
+    const ok = window.confirm(
+      `Approve ${clean.length} clean draft${clean.length === 1 ? "" : "s"}?\n\n` +
+        `Clean = unreviewed, zero held lines, no block/warn findings ` +
+        `(info-only is fine). Existing notes are kept.`
+    );
+    if (ok) approveMany(clean.map((p) => p.slug));
+  };
 
   return (
     <div className="space-y-6">
@@ -472,26 +638,73 @@ export function InvoicesScreen({ context }: ScreenProps) {
             flag it, and print. Held lines are excluded from totals until resolved.
           </p>
         </div>
-        <ExportBar />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            data-testid="approve-all-clean"
+            disabled={clean.length === 0}
+            title={
+              clean.length === 0
+                ? "Nothing qualifies — clean means unreviewed with zero held lines and no block/warn findings"
+                : `Approve ${clean.length} unreviewed draft${clean.length === 1 ? "" : "s"} with zero held lines and only info-level findings`
+            }
+            onClick={approveAllClean}
+          >
+            <CheckCheck className="h-4 w-4" />
+            Approve all clean
+          </Button>
+          <ExportBar />
+        </div>
+      </div>
+
+      <div
+        className="rise flex flex-wrap items-center gap-1.5"
+        style={{ "--rise-i": 1 } as React.CSSProperties}
+        role="group"
+        aria-label="Filter drafts by review status"
+      >
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          return (
+            <button
+              key={f.key}
+              data-testid={`invoice-filter-${f.key}`}
+              aria-pressed={active}
+              onClick={() => setFilter(f.key)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                active
+                  ? "border-primary/40 bg-primary/15 text-primary"
+                  : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {f.label}
+              <span className="tabular">{counts[f.key]}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {model.partners.map((p, i) => (
+        {filtered.map((p, i) => (
           <PartnerCard
             key={p.slug}
             draft={p}
             status={review[p.slug]?.status}
-            index={i + 1}
+            index={i + 2}
             onOpen={() => setSelectedSlug(p.slug)}
           />
         ))}
       </div>
 
-      {model.partners.length === 0 && (
+      {model.partners.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No partner drafts this month — no usage matched a special-pricing block.
         </p>
-      )}
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No drafts match this filter — pick another chip.
+        </p>
+      ) : null}
     </div>
   );
 }

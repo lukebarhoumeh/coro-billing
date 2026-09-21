@@ -15,7 +15,7 @@ import { toQuickBooksCsv, toIif } from "@pipeline/export/quickbooks.js";
 import { Button } from "@/components/ui/button";
 
 export function ExportBar() {
-  const { model, review, files, period } = useClose();
+  const { model, review, files, period, markExported } = useClose();
   if (model === null) return null;
 
   const unapproved = model.partners.filter((p) => review[p.slug]?.status !== "approved");
@@ -27,6 +27,7 @@ export function ExportBar() {
       invoiceFile: files.invoice?.fileName,
     });
     downloadWorkbook(wb, `coro-close-${period}.xlsx`);
+    markExported("excel");
   };
 
   /** Approved partners' rated lines, or — after an explicit confirm — everything. */
@@ -53,8 +54,10 @@ export function ExportBar() {
     const invoices = buildInvoices([...lines], period);
     if (format === "csv") {
       downloadText(`coro-close-${period}-quickbooks.csv`, "text/csv", toQuickBooksCsv(invoices));
+      markExported("qbcsv");
     } else {
       downloadText(`coro-close-${period}-quickbooks.iif`, "text/plain", toIif(invoices));
+      markExported("qbiif");
     }
   };
 

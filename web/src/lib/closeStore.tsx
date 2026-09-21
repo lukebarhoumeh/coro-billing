@@ -62,12 +62,45 @@ export interface PacketManifest {
   readonly files: Partial<Readonly<Record<SlotKey, string>>>;
 }
 
+export type ExportKind = "excel" | "qbcsv" | "qbiif";
+
+/** The month-end checklist state, derived live from the model + review. */
+export interface CloseProgress {
+  readonly filesReady: boolean;
+  readonly invoiceLoaded: boolean;
+  readonly blockers: number; // block-severity findings still standing
+  readonly approved: number;
+  readonly totalDrafts: number;
+  readonly exportedAny: boolean;
+}
+
+/** Stable identity for a finding, for the acknowledge burn-down. */
+export function findingKey(f: {
+  kind: string;
+  partner: string;
+  sku: string;
+  sourceRow?: number;
+}): string {
+  return `${f.kind}|${f.partner}|${f.sku}|${f.sourceRow ?? ""}`;
+}
+
 export interface CloseStore {
   readonly files: Partial<Readonly<Record<SlotKey, LoadedSlot>>>;
   readonly demo: boolean;
   readonly period: Period;
   readonly model: CloseModel | null;
   readonly review: ReviewState;
+  /** Acknowledged finding keys (findingKey()) — the exception burn-down. */
+  readonly acked: ReadonlySet<string>;
+  /** ISO timestamps of exports taken for this month's files. */
+  readonly exported: Partial<Readonly<Record<ExportKind, string>>>;
+  /** The live month-end checklist. */
+  readonly progress: CloseProgress;
+  /**
+   * Set when a loaded Coro invoice's service month differs from the close
+   * month on ≥half its lines — the July-invoice-vs-August-usage trap.
+   */
+  readonly invoicePeriodMismatch: { readonly invoicePeriod: Period; readonly lines: number } | null;
   /** Last per-slot error message (cleared on a successful drop). */
   readonly errors: Partial<Readonly<Record<SlotKey, string>>>;
   /** Bundled month packet, when the deployment carries one. */
@@ -78,24 +111,47 @@ export interface CloseStore {
   loadDemo(): void;
   loadPacket(): Promise<void>;
   setReview(slug: string, entry: ReviewEntry | null): void;
+  /** Bulk-approve (keeps any existing notes). */
+  approveMany(slugs: readonly string[]): void;
+  toggleAck(key: string): void;
+  markExported(kind: ExportKind): void;
 }
 
 const Ctx = createContext<CloseStore | null>(null);
 
 const DEFAULT_PERIOD: Period = "2026-08";
 
-function loadReview(key: string): ReviewState {
+/** Everything persisted per (period, file fingerprints). */
+interface MonthState {
+  readonly review: ReviewState;
+  readonly acked: readonly string[];
+  readonly exported: Partial<Record<ExportKind, string>>;
+}
+
+const EMPTY_MONTH: MonthState = { review: {}, acked: [], exported: {} };
+
+function loadMonthState(key: string): MonthState {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as ReviewState) : {};
+    if (!raw) return EMPTY_MONTH;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (parsed && typeof parsed === "object" && "review" in parsed) {
+      return {
+        review: (parsed["review"] as ReviewState) ?? {},
+        acked: Array.isArray(parsed["acked"]) ? (parsed["acked"] as string[]) : [],
+        exported: (parsed["exported"] as MonthState["exported"]) ?? {},
+      };
+    }
+    // Legacy shape: the blob WAS the review map.
+    return { ...EMPTY_MONTH, review: parsed as unknown as ReviewState };
   } catch {
-    return {}; // private mode / quota / corrupt JSON — start clean, never crash
+    return EMPTY_MONTH; // private mode / quota / corrupt JSON — start clean, never crash
   }
 }
 
-function saveReview(key: string, review: ReviewState): void {
+function saveMonthState(key: string, state: MonthState): void {
   try {
-    localStorage.setItem(key, JSON.stringify(review));
+    localStorage.setItem(key, JSON.stringify(state));
   } catch {
     // Persistence is best-effort; the in-memory state still works.
   }
@@ -106,7 +162,7 @@ export function CloseProvider({ children }: { children: ReactNode }) {
   const [errors, setErrors] = useState<Partial<Record<SlotKey, string>>>({});
   const [demo, setDemo] = useState(false);
   const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
-  const [review, setReviewState] = useState<ReviewState>({});
+  const [month, setMonth] = useState<MonthState>(EMPTY_MONTH);
   const [packet, setPacket] = useState<PacketManifest | null>(null);
   const [packetLoading, setPacketLoading] = useState(false);
 
@@ -146,10 +202,22 @@ export function CloseProvider({ children }: { children: ReactNode }) {
     return reviewStorageKey(period, files.pricing.fingerprint, files.usage.fingerprint);
   }, [files.pricing, files.usage, period]);
 
-  // (Re)hydrate review whenever the month identity changes.
+  // (Re)hydrate review/ack/export state whenever the month identity changes.
   useEffect(() => {
-    setReviewState(storageKey ? loadReview(storageKey) : {});
+    setMonth(storageKey ? loadMonthState(storageKey) : EMPTY_MONTH);
   }, [storageKey]);
+
+  /** Update the month state and write through to localStorage. */
+  const patchMonth = useCallback(
+    (fn: (m: MonthState) => MonthState) => {
+      setMonth((m) => {
+        const next = fn(m);
+        if (storageKey) saveMonthState(storageKey, next);
+        return next;
+      });
+    },
+    [storageKey]
+  );
 
   const ingestFile = useCallback(
     async (slot: SlotKey, file: File) => {
@@ -220,15 +288,49 @@ export function CloseProvider({ children }: { children: ReactNode }) {
 
   const setReview = useCallback(
     (slug: string, entry: ReviewEntry | null) => {
-      setReviewState((r) => {
-        const next: Record<string, ReviewEntry> = { ...r };
-        if (entry === null) delete next[slug];
-        else next[slug] = entry;
-        if (storageKey) saveReview(storageKey, next);
-        return next;
+      patchMonth((m) => {
+        const review: Record<string, ReviewEntry> = { ...m.review };
+        if (entry === null) delete review[slug];
+        else review[slug] = entry;
+        return { ...m, review };
       });
     },
-    [storageKey]
+    [patchMonth]
+  );
+
+  const approveMany = useCallback(
+    (slugs: readonly string[]) => {
+      patchMonth((m) => {
+        const review: Record<string, ReviewEntry> = { ...m.review };
+        for (const slug of slugs) {
+          review[slug] = { status: "approved", note: review[slug]?.note ?? "" };
+        }
+        return { ...m, review };
+      });
+    },
+    [patchMonth]
+  );
+
+  const toggleAck = useCallback(
+    (key: string) => {
+      patchMonth((m) => {
+        const acked = m.acked.includes(key)
+          ? m.acked.filter((k) => k !== key)
+          : [...m.acked, key];
+        return { ...m, acked };
+      });
+    },
+    [patchMonth]
+  );
+
+  const markExported = useCallback(
+    (kind: ExportKind) => {
+      patchMonth((m) => ({
+        ...m,
+        exported: { ...m.exported, [kind]: new Date().toISOString() },
+      }));
+    },
+    [patchMonth]
   );
 
   /** Load the deployment's bundled month packet through the SAME parse path as drops. */
@@ -265,13 +367,50 @@ export function CloseProvider({ children }: { children: ReactNode }) {
     }
   }, [packet, packetLoading]);
 
+  const acked = useMemo(() => new Set(month.acked), [month.acked]);
+
+  const progress = useMemo<CloseProgress>(() => {
+    const totalDrafts = model?.partners.length ?? 0;
+    const approved =
+      model?.partners.filter((p) => month.review[p.slug]?.status === "approved").length ?? 0;
+    return {
+      filesReady: files.pricing !== undefined && files.usage !== undefined,
+      invoiceLoaded: files.invoice !== undefined,
+      blockers: model?.findings.filter((f) => f.severity === "block").length ?? 0,
+      approved,
+      totalDrafts,
+      exportedAny: Object.keys(month.exported).length > 0,
+    };
+  }, [files, model, month.review, month.exported]);
+
+  // The July-invoice-vs-August-usage trap: warn when the loaded Coro invoice's
+  // service month disagrees with the close month on at least half its lines.
+  const invoicePeriodMismatch = useMemo(() => {
+    const invoice = files.invoice?.payload;
+    if (invoice?.slot !== "invoice" || invoice.lines.length === 0) return null;
+    const counts = new Map<Period, number>();
+    for (const l of invoice.lines) {
+      if (l.servicePeriod !== undefined) {
+        counts.set(l.servicePeriod, (counts.get(l.servicePeriod) ?? 0) + 1);
+      }
+    }
+    let top: Period | null = null;
+    let topCount = 0;
+    for (const [p, n] of counts) if (n > topCount) { top = p; topCount = n; }
+    if (top === null || top === period) return null;
+    if (topCount * 2 < invoice.lines.length) return null;
+    return { invoicePeriod: top, lines: topCount };
+  }, [files.invoice, period]);
+
   const store = useMemo<CloseStore>(
     () => ({
-      files, demo, period, model, review, errors, packet, packetLoading,
-      ingestFile, clearSlot, loadDemo, loadPacket, setReview,
+      files, demo, period, model, review: month.review, acked, exported: month.exported,
+      progress, invoicePeriodMismatch, errors, packet, packetLoading,
+      ingestFile, clearSlot, loadDemo, loadPacket, setReview, approveMany, toggleAck, markExported,
     }),
-    [files, demo, period, model, review, errors, packet, packetLoading,
-      ingestFile, clearSlot, loadDemo, loadPacket, setReview]
+    [files, demo, period, model, month.review, acked, month.exported, progress,
+      invoicePeriodMismatch, errors, packet, packetLoading,
+      ingestFile, clearSlot, loadDemo, loadPacket, setReview, approveMany, toggleAck, markExported]
   );
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

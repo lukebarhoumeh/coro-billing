@@ -20,6 +20,8 @@ import {
 import { useClose, SYNTHETIC_BANNER } from "@/lib/closeStore";
 import type { ScreenProps, SectionKey } from "@/lib/nav";
 import { cn } from "@/lib/cn";
+import { CloseChecklist } from "@/components/CloseChecklist";
+import { HelpDialog } from "@/components/HelpDialog";
 import { IntakeScreen } from "@/screens/Intake";
 import { OverviewScreen } from "@/screens/Overview";
 import { RateCardsScreen } from "@/screens/RateCards";
@@ -152,6 +154,7 @@ export default function App() {
               );
             })}
           </nav>
+          <CloseChecklist onNavigate={(s) => onNavigate(s)} />
         </aside>
 
         {/* Main column */}
@@ -165,8 +168,24 @@ export default function App() {
               <FileChip label="pricing" loaded={store.files.pricing?.fileName} />
               <FileChip label="usage" loaded={store.files.usage?.fileName} />
               <FileChip label="invoice" loaded={store.files.invoice?.fileName} />
+              <HelpDialog />
             </div>
           </header>
+
+          {store.invoicePeriodMismatch !== null && (
+            <div
+              className="flex items-center justify-center gap-2 border-b border-warning/40 bg-warning/10 px-4 py-1.5 text-center text-xs text-warning"
+              data-testid="period-mismatch"
+            >
+              <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                The loaded Coro invoice is mostly <b>{store.invoicePeriodMismatch.invoicePeriod}</b>{" "}
+                service ({store.invoicePeriodMismatch.lines} lines) but this close is{" "}
+                <b>{store.period}</b> — cost cross-checks won't line up. Load the matching month's
+                invoice, or the matching usage.
+              </span>
+            </div>
+          )}
 
           <main className="flex-1 overflow-auto p-6 lg:p-8">
             {active.needsModel && store.model === null ? (
