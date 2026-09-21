@@ -210,7 +210,22 @@ export type ExceptionKind =
   | "USAGE_NOT_ON_INVOICE" // consumed per usage but Coro billed nothing — NOT billed to the MSP
   | "OUT_OF_PERIOD_LINE" // invoice line whose service window is outside the close month
   | "UNMAPPED_PARTNER" // usage workspace slug not in the curated partner map
-  | "AUDIT_QTY_MISMATCH"; // Coro's audit-stated qty != our users/devices reduction
+  | "AUDIT_QTY_MISMATCH" // Coro's audit-stated qty != our users/devices reduction
+  // --- Rate-card close (docs/superpowers/specs/2026-09-21-coro-billing-ui-revamp-design.md) ---
+  | "SHEET_MATH_INCONSISTENT" // pricing CSV cell disagrees with its own inputs (col H vs E×0.95, col I vs F+G)
+  | "DUPLICATE_RATE_ROW" // same product twice in one partner block — first kept
+  | "MISSING_WORKSPACE_ID" // partner block with no workspace slug — cannot join usage
+  | "DUPLICATE_WORKSPACE_ID" // two partner blocks share a workspace slug
+  | "EMPTY_PARTNER_BLOCK" // a name-only stray row (e.g. "XTB") with no products
+  | "LIST_PRICE_DIVERGES" // Danny: list "should be the same in every single one" — it isn't
+  | "MISSING_RATE" // usage maps to a pricing row with no Net Price to MSP — line HELD
+  | "UNKNOWN_PRODUCT_CODE" // usage product code resolves to no pricing row at all — line HELD
+  | "INVOICE_QTY_DISAGREES" // Coro invoice qty != audit-derived usage qty for partner+sku
+  | "INVOICE_RATE_UNEXPECTED" // Coro-billed unit cost matches neither the sheet nor the additive rule
+  | "ASSUMED_MAPPING" // ADD*flex priced via the Modules Flex chain — unconfirmed mapping
+  | "PRODUCT_FALLBACK" // priced from a fallback row (e.g. BUCOMflex → "Coro AI Complete")
+  | "USAGE_NOT_ON_CARD" // usage parent workspace has no special-pricing block
+  | "NFR_LINE"; // not-for-resale SKU — listed, never billed
 
 export interface Exception {
   readonly kind: ExceptionKind;
@@ -304,4 +319,54 @@ export interface DiscrepancyReport {
   readonly discrepancies: readonly Discrepancy[];
   readonly onlyInOurs: readonly RatedLine[];
   readonly onlyInLindita: readonly LinditaLine[];
+}
+
+/* ------------------------------------------------------------------------- *
+ * Rate-card close (Sep 2026): the Coro "Special MSP Pricing" CSV finally
+ * landed (Sep 18 call with Danny Gaston). Column E — "Net Price to MSP" — is
+ * the partner's cost, i.e. L, what the MSP pays Hub (Luke, 2026-09-21).
+ * Spec: docs/superpowers/specs/2026-09-21-coro-billing-ui-revamp-design.md
+ * ------------------------------------------------------------------------- */
+
+/** One product row of a partner's special-pricing block (CSV columns C-I). */
+export interface PricingRow {
+  /** Col C as written ("Coro AI Complete", "Modules Flex", "SAT Flex"…). */
+  readonly product: string;
+  /** Col D. Null = blank/garbage cell (kept, never invented). */
+  readonly listPrice: Money | null;
+  /** Col E — L: what the MSP pays Hub. Null ⇒ close HOLDS lines priced by this row. */
+  readonly netMsp: Money | null;
+  /** Col F, `60` for "60%". */
+  readonly mspDiscountPct: number | null;
+  /** Col G — the Hub margin discount (usually 5). */
+  readonly hubDiscountPct: number | null;
+  /** Col H exactly as WRITTEN. Do not trust: validated against E×0.95 and the additive rule. */
+  readonly netHubStated: Money | null;
+  /** Col I as written. Validated against F+G. */
+  readonly totalDiscountPct: number | null;
+  /** 1-based CSV source row. */
+  readonly sourceRow: number;
+}
+
+/** One partner block of the special-pricing CSV (plus folded "Managed" sub-blocks). */
+export interface PricingPartner {
+  readonly name: string;
+  /** Col B, trimmed + lowercased ("sevenstarsystemscom_x8e3_b"). Null = missing (flagged). */
+  readonly workspaceId: string | null;
+  readonly rows: readonly PricingRow[];
+  /** Col J raw — free text ("$1,000.00", "Awaiting sig.", "New Partner (Standard Tier Pricing)"). */
+  readonly approxMonthlySpend: string | null;
+  readonly activeUsers: string | null;
+  readonly totalWorkspaces: string | null;
+  readonly contactName: string | null;
+  readonly contactPhone: string | null;
+  readonly contactEmail: string | null;
+  readonly address: string | null;
+  readonly sourceRow: number;
+}
+
+export interface SpecialPricingResult {
+  readonly partners: readonly PricingPartner[];
+  /** In-file validation findings (sheet-math, duplicates, missing workspace ids…). */
+  readonly findings: readonly Exception[];
 }
