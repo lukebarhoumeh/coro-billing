@@ -182,11 +182,15 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       });
 
       // --- resolve the invoice aggregate for this partner×sku, if any ---
+      // Try the curated invoice name first, then the card's own name — the
+      // curated map only covers partners seen on past invoices; new partners
+      // usually appear on the invoice under their card name.
       let invoiceAgg: InvoiceAgg | undefined;
-      if (invoiceName !== null) {
-        invoiceAgg = invoiceByKey.get(`${invoiceName.toLowerCase()}|${g.vendorSku.trim().toLowerCase()}`);
-        if (invoiceAgg) invoiceAgg.consumed = true;
+      for (const name of [invoiceName, card.name]) {
+        if (name === null || invoiceAgg !== undefined) continue;
+        invoiceAgg = invoiceByKey.get(`${name.toLowerCase()}|${g.vendorSku.trim().toLowerCase()}`);
       }
+      if (invoiceAgg) invoiceAgg.consumed = true;
 
       // --- match-kind findings ---
       const productLabel = row?.product ?? g.productName ?? g.vendorSku;
