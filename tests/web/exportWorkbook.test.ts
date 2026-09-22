@@ -159,4 +159,82 @@ describe("buildCloseWorkbook", () => {
     const total = tab[tab.length - 1]!;
     expect(total["Credit Expected"]).toBeCloseTo(20, 2);
   });
+
+  it("reconciles per-line Credit Expected cells to the partner total (=SUM() foots)", () => {
+    // Two legacy lines whose credits are exactly $1.115 each: independent 2-dp
+    // rounding gives 1.12 + 1.12 = 2.24 vs the true total 2.23 — the workbook
+    // must allocate so the column foots cent-exact (real-world case: XTB Aug).
+    const partner = {
+      name: "Penny Case",
+      workspaceId: "pennycasecom_aaaa_b",
+      rows: [
+        {
+          product: "Essentials Flex",
+          listPrice: Money.of("7.50"),
+          netMsp: Money.of("3.00"),
+          mspDiscountPct: 60,
+          hubDiscountPct: 5,
+          netHubStated: null,
+          totalDiscountPct: 65,
+          sourceRow: 10,
+        },
+        {
+          product: "Endpoint Protection Flex",
+          listPrice: Money.of("7.50"),
+          netMsp: Money.of("3.00"),
+          mspDiscountPct: 60,
+          hubDiscountPct: 5,
+          netHubStated: null,
+          totalDiscountPct: 65,
+          sourceRow: 11,
+        },
+      ],
+      approxMonthlySpend: null,
+      activeUsers: null,
+      totalWorkspaces: null,
+      contactName: null,
+      contactPhone: null,
+      contactEmail: null,
+      address: null,
+      sourceRow: 1,
+    };
+    const usageLine = (code: string, sourceRow: number) => ({
+      period: "2026-08" as const,
+      partner: "pennycasecom_AAAA_b",
+      customer: null,
+      sku: { vendorSku: code, class: "legacy" as const, isLegacy: true },
+      quantity: 3,
+      u: { raw: null, known: false },
+      d: { raw: null, known: false },
+      raw: {},
+      sourceRow,
+    });
+    const invLine = (code: string, lineNumber: number) => ({
+      invoiceNumber: "INVCUS2026-0002193",
+      lineNumber,
+      sku: code,
+      partner: "Penny Case",
+      quantity: 3,
+      unitPrice: Money.of("8.99").div(3),
+      amount: Money.of("8.99"), // credit = 8.99 − 2.625×3 = 1.115 exactly
+      servicePeriod: "2026-08" as const,
+      raw: {},
+    });
+    const m = closeFromRateCard({
+      pricing: { partners: [partner], findings: [] },
+      usage: [usageLine("BUCOROflex", 100), usageLine("BUENDflex", 101)],
+      coroInvoiceLines: [invLine("BUCOROflex", 1), invLine("BUENDflex", 2)],
+      period: "2026-08",
+    });
+    expect(m.totalCreditExpected.toFixed2()).toBe("2.23");
+    const wb2 = buildCloseWorkbook(m, {});
+    const tab = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb2.Sheets["Penny Case"]!);
+    const cells = tab
+      .filter((r) => r["Product"] !== "" && r["Product"] !== "TOTAL" && r["Credit Expected"] != null)
+      .map((r) => r["Credit Expected"] as number);
+    expect(cells).toHaveLength(2);
+    const total = tab[tab.length - 1]!["Credit Expected"] as number;
+    expect(total).toBeCloseTo(2.23, 2);
+    expect(cells.reduce((a, b) => a + b, 0)).toBeCloseTo(total, 10); // column foots exactly
+  });
 });

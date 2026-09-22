@@ -263,7 +263,7 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
         if (
           row.mspDiscountPct !== null &&
           row.hubDiscountPct !== null &&
-          row.mspDiscountPct + row.hubDiscountPct !== 45
+          (row.mspDiscountPct !== 40 || row.hubDiscountPct !== 5)
         ) {
           flist.push(
             exception("CLASSIC_RATE_RULE_DISAGREES", "info", card.name, g.vendorSku, period,

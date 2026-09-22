@@ -10,7 +10,9 @@
  * export for Excel, not a display surface.
  */
 import * as XLSX from "xlsx";
-import type { CloseModel } from "../../../src/domain/types.js";
+import { allocateCents } from "../../../src/lib/allocate.js";
+import type { Money } from "../../../src/lib/money.js";
+import type { CloseModel, DraftLine } from "../../../src/domain/types.js";
 
 /** Review state shape mirrored from closeStore (kept structural to stay DOM-free). */
 export interface ReviewEntryLike {
@@ -75,6 +77,20 @@ export function buildCloseWorkbook(
 
   // --- One tab per partner (Lindita-workbook shape: qty, L, H, margin) -------
   for (const p of model.partners) {
+    // Per-line "Credit Expected" cells are largest-remainder-allocated from the
+    // partner rollup so =SUM() over the column foots cent-exact — independent
+    // 2-dp rounding of full-precision credits can drift a penny vs the TOTAL
+    // row (real August: XTB's three lines rounded to 76.39 vs total 76.38).
+    const creditLines = p.lines.filter((l) => l.creditExpected !== null);
+    const creditCells = new Map<DraftLine, Money>();
+    if (creditLines.length > 0) {
+      const alloc = allocateCents(
+        p.totalCreditExpected,
+        creditLines.map((l) => l.creditExpected!.toCents())
+      );
+      creditLines.forEach((l, i) => creditCells.set(l, alloc[i]!));
+    }
+
     const rows: Record<string, string | number | null>[] = [];
     for (const line of p.lines) {
       rows.push({
@@ -91,7 +107,7 @@ export function buildCloseWorkbook(
         "Team Client Price": num(line.teamClientPrice),
         Margin: num(line.margin),
         Basis: line.marginBasis,
-        "Credit Expected": num(line.creditExpected),
+        "Credit Expected": num(creditCells.get(line) ?? null),
         Match: line.matchKind,
         Findings: line.findings.map((f) => f.kind).join(", "),
       });

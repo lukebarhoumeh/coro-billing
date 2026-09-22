@@ -169,6 +169,16 @@ describe("resolvePricingRow — ADD*, NFR, unknowns", () => {
     expect(m.row!.product).toBe("Modules Flex");
   });
 
+  it("keeps ADD* last-resort pricing surfaced as fallback-current, not a confirmed match", () => {
+    // 29 of 42 real cards carry only "Coro AI Modules" — an ADD line there must
+    // stay visible as a fallback (PRODUCT_FALLBACK), not silently confirmed.
+    const bare = partner("Bare", [row("Coro AI Modules", "6.00")]);
+    const m = resolvePricingRow(bare, "ADDMDRflex");
+    expect(m.kind).toBe("fallback-current");
+    expect(m.row!.product).toBe("Coro AI Modules");
+    expect(m.reason).not.toContain("confirmed");
+  });
+
   it("marks COR-COMP-NFR non-billable", () => {
     const p = partner("Hurricane IT", [row("Coro AI Complete", "12.00")]);
     const m = resolvePricingRow(p, "COR-COMP-NFR");

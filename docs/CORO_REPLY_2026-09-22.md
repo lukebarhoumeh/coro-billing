@@ -69,7 +69,8 @@ Notes:
 2. **Column H, systemically.** You said col H represents our expected license cost (±$0.01
    rounding). Against your own stated model (H = list × (1 − col I)), **280 of 299 priced rows
    don't match**: 276 carry the older `E × 0.95` value instead (deltas +$0.10 to +$3.15/unit — not
-   rounding), 3 match neither — **B2B Endpoint Protection Flex $3.30**, **B2B Managed Coro
+   rounding — except one row where E×0.95 *under*-states the additive cost by $0.37: Logic-IT
+   "Coro Managed", sheet row 248), 3 match neither — **B2B Endpoint Protection Flex $3.30**, **B2B Managed Coro
    Essentials Flex $5.50** (its E of $6.40 also isn't list×(1−F) = $7.25), **Live-Tech Coro AI
    Modules $5.63** (likely a typo for $5.70) — and 1 is blank (**Cyber Construction Essentials
    Flex**). The 17 rows you re-derived in this revision are all correct. Full classification in

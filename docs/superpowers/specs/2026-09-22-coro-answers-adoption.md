@@ -126,8 +126,8 @@ TechLead `BUCOCLASSMNflex` correctly excluded — Classic exception makes Coro's
 | TechLead | $695.00 | BUCOMMNGflex $680.00 (340 × $2.00), BUCOROflex $15.00 |
 | Net-Tech | $150.00 | BUEMAILflex (Coro billed $4.125 flat vs additive $2.625 × 100) |
 | Evolve | $95.00 | BUCOMflex $27.00, BUCOMMNGflex $68.00 |
-| XTB Solutions | $76.38 | BUCOMflex $37.50, BUCOROflex $29.25, BUENDflex $9.66 |
-| Teledata | $25.00 | BUCOROflex $2.96, BUENDflex $21.92 |
+| XTB Solutions | $76.38 | BUCOMflex $37.50, BUCOROflex $29.26, BUENDflex $9.63 (display-rounded; full-precision lines sum to the total) |
+| Teledata | $25.00 | BUCOROflex $3.00, BUENDflex $22.00 |
 
 **Discovery during implementation:** Coro HAS been billing Net-Tech's email protection all along
 ($412.50 on 2193 at the flat legacy rate) — the old HELD line just never attached its invoice
@@ -148,7 +148,7 @@ honest August picture; the UI shows "after expected credits" alongside. Post-cre
 
 - `docs/CORO_REPLY_2026-09-22.md` — everything Coro asked us to share: the column-H analysis +
   the new-sheet issues (§2), the credit quantification (§4), usage re-export corruption.
-- `out/coro-reply/column-h-discrepancies.csv` — full 279-row machine-readable H list.
+- `out/coro-reply/column-h-discrepancies.csv` — all 299 priced rows classified (280 fail Coro's stated H model).
 - Call agenda (in the reply doc): Rocker July double-bill credit ($153.31), Ideal Tech 371 seats,
   canonical usage format + stated-quantity rule + two corrupt re-exports, Avox naming (proposal:
   keep "Avox" + add a workspace-ID column to invoice detail), legacy MOD\* list-price question,

@@ -156,13 +156,14 @@ export function resolvePricingRow(partner: PricingPartner, vendorSku: string): R
 
   if (code.startsWith("add")) {
     const m = resolveModulesChain(partner, vendorSku, "add-module");
-    return m.kind === "none"
-      ? m
-      : {
-          ...m,
-          kind: "add-module",
-          reason: `${vendorSku} = Modules Flex (confirmed by Coro 2026-09-22) → "${m.row!.product}"`,
-        };
+    // Only a genuine generic-modules hit is the Coro-confirmed mapping; a
+    // "Coro AI Modules" last resort stays fallback-current so the close still
+    // surfaces PRODUCT_FALLBACK (nothing silently resolved).
+    if (m.kind !== "add-module") return m;
+    return {
+      ...m,
+      reason: `${vendorSku} = Modules Flex (confirmed by Coro 2026-09-22) → "${m.row!.product}"`,
+    };
   }
 
   const legacy = LEGACY_BUNDLES[code];

@@ -373,6 +373,20 @@ describe("closeFromRateCard — Classic-family forced cost (Coro 2026-09-22 answ
     expect(line.margin!.toFixed2()).toBe("-8.44");
   });
 
+  it("flags a Classic row that sums to 45 but is not 40/5 (documented rule, not the sum)", () => {
+    const odd = pp("Odd Card", "oddcardcom_aaaa_b", [
+      prow("Managed Classic Flex", { list: "16.99", e: "9.51", f: 44, g: 1, h: "9.34", i: 45 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(odd),
+      usage: [ul("oddcardcom_AAAA_b", null, "BUCOCLASSMNflex", 5)],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.expectedHAdditive!.toFixed2()).toBe("9.34"); // still forced
+    expect(line.findings.filter((x) => x.kind === "CLASSIC_RATE_RULE_DISAGREES")).toHaveLength(1);
+  });
+
   it("stays quiet on a compliant 40/5 Classic row (same number both ways)", () => {
     const cc = pp("Cyber Construction", "cyber-constructioncom_x3e7_b", [
       prow("Managed Coro Classic", { list: "16.99", e: "10.20", f: 40, g: 5, h: "9.35", i: 45 }),
