@@ -121,6 +121,8 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
     readonly sku: string;
     quantity: number;
     amount: Money;
+    /** Distinct non-null "Client Price" cents seen — the team's keyed bill-out rate. */
+    clientPriceCents: Set<number>;
     consumed: boolean;
   }
   const invoiceByKey = new Map<string, InvoiceAgg>();
@@ -145,11 +147,21 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
     const key = `${name.toLowerCase()}|${line.sku.trim().toLowerCase()}`;
     let agg = invoiceByKey.get(key);
     if (!agg) {
-      agg = { partnerName: name, sku: line.sku, quantity: 0, amount: Money.zero(), consumed: false };
+      agg = {
+        partnerName: name,
+        sku: line.sku,
+        quantity: 0,
+        amount: Money.zero(),
+        clientPriceCents: new Set(),
+        consumed: false,
+      };
       invoiceByKey.set(key, agg);
     }
     agg.quantity += line.quantity;
     agg.amount = agg.amount.add(line.amount);
+    if (line.clientPrice !== null && line.clientPrice !== undefined) {
+      agg.clientPriceCents.add(line.clientPrice.toCents());
+    }
   }
 
   // ---- build per-partner drafts ----
@@ -266,6 +278,26 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
         }
       }
 
+      // --- team's keyed bill-out rate (invoice workbook "Client Price") ---
+      // Unambiguous only when every keyed line for this partner×sku agrees.
+      // NEVER a rate source — a HELD line stays held; this is review context
+      // (the manual process's actual bill, e.g. "Coro August Billing.xlsx").
+      let teamClientPrice: Money | null = null;
+      if (invoiceAgg !== undefined && invoiceAgg.clientPriceCents.size === 1) {
+        teamClientPrice = Money.of([...invoiceAgg.clientPriceCents][0]! / 100);
+        if (
+          unitL !== null &&
+          Math.abs(teamClientPrice.toCents() - unitL.toCents()) > UNIT_TOLERANCE_CENTS
+        ) {
+          flist.push(
+            exception("CLIENT_PRICE_DIFFERS", "warn", card.name, g.vendorSku, period,
+              `the team's workbook bills this at ${teamClientPrice.toFixed2()}/unit but the ` +
+                `rate card (col E) says ${unitL.toFixed2()} — drafting the card rate; ` +
+                `if the workbook price is the negotiated one, the card needs updating`)
+          );
+        }
+      }
+
       // --- margin ---
       const amountL = unitL !== null ? unitL.mul(g.quantity) : null;
       let margin: Money | null = null;
@@ -293,6 +325,7 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
         actualHUnit,
         actualHAmount,
         invoiceQuantity,
+        teamClientPrice,
         margin,
         marginBasis,
         findings: flist,

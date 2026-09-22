@@ -28,6 +28,10 @@ const ENTRIES: readonly { term: string; def: string }[] = [
     def: "Your sign-off per draft invoice, with an optional note. Saved in this browser for this month's exact files — re-loading the same files restores it. QuickBooks exports include approved drafts only (you're asked before drafts are included).",
   },
   {
+    term: "“Team billed differently”",
+    def: "When the accounting team's manual workbook (its Client Price column) is loaded and its keyed bill-out rate differs from the special-pricing card, the line shows both. The draft always uses the card; if the workbook price is the negotiated one, the card needs updating — that's a Coro/Danny conversation, not an edit here.",
+  },
+  {
     term: "Acknowledge (findings)",
     def: "A checkbox per finding on the Exceptions screen so the team can burn the list down. Acknowledging records that a human saw it — it does not change any number.",
   },

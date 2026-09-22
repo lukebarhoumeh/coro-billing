@@ -225,7 +225,8 @@ export type ExceptionKind =
   | "ASSUMED_MAPPING" // ADD*flex priced via the Modules Flex chain — unconfirmed mapping
   | "PRODUCT_FALLBACK" // priced from a fallback row (e.g. BUCOMflex → "Coro AI Complete")
   | "USAGE_NOT_ON_CARD" // usage parent workspace has no special-pricing block
-  | "NFR_LINE"; // not-for-resale SKU — listed, never billed
+  | "NFR_LINE" // not-for-resale SKU — listed, never billed
+  | "CLIENT_PRICE_DIFFERS"; // team's keyed bill-out rate ≠ the rate card's col E
 
 export interface Exception {
   readonly kind: ExceptionKind;
@@ -419,6 +420,13 @@ export interface DraftLine {
   /** Coro invoice Subtotal for this partner×sku — authoritative actual cost. */
   readonly actualHAmount: Money | null;
   readonly invoiceQuantity: number | null;
+  /**
+   * The accounting team's keyed bill-out rate — the "Client Price" column of
+   * their invoice workbook (e.g. "Coro August Billing.xlsx"), when loaded and
+   * unambiguous for this partner×SKU. Context for review, NEVER a rate source:
+   * a HELD line stays held even when the team billed it manually.
+   */
+  readonly teamClientPrice: Money | null;
   /** amountL − (actualHAmount ?? expectedHAdditive×qty); null when no basis. */
   readonly margin: Money | null;
   readonly marginBasis: "actual" | "expected-additive" | "none";

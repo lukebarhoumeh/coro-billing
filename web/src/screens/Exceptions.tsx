@@ -37,6 +37,7 @@ const SECTION_FOR_KIND: Partial<Record<ExceptionKind, SectionKey>> = {
   NFR_LINE: "invoices",
   ASSUMED_MAPPING: "invoices",
   PRODUCT_FALLBACK: "invoices",
+  CLIENT_PRICE_DIFFERS: "invoices",
 };
 
 type Severity = Exception["severity"];

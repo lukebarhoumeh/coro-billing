@@ -85,7 +85,8 @@ function inv(
   sku: string,
   quantity: number,
   amount: string,
-  servicePeriod = "2026-08"
+  servicePeriod = "2026-08",
+  clientPrice?: string
 ): CoroInvoiceLine {
   return {
     invoiceNumber: "INVCUS2026-0002193",
@@ -96,6 +97,7 @@ function inv(
     unitPrice: Money.of(amount).div(quantity),
     amount: Money.of(amount),
     servicePeriod,
+    ...(clientPrice !== undefined ? { clientPrice: Money.of(clientPrice) } : {}),
     raw: {},
   };
 }
@@ -282,6 +284,68 @@ describe("closeFromRateCard — held, NFR, join gaps", () => {
     expect(model.usageOnly).toEqual([{ slug: "mysteryco_zzzz_b", partner: "mysteryco" }]);
     expect(model.findings.filter((f) => f.kind === "USAGE_NOT_ON_CARD")).toHaveLength(1);
     expect(model.cardOnly.map((p) => p.name)).toEqual(["Meeting Tree Computer"]);
+  });
+});
+
+describe("closeFromRateCard — team Client Price cross-check (Coro August Billing workbook)", () => {
+  // The accounting team keys their bill-out rate into the invoice workbook's
+  // "Client Price" column. When it disagrees with the rate card's col E, the
+  // close must say so — that keyed price is what was ACTUALLY billed in the
+  // manual process (audit of 2026-09-21: 33 legacy lines diverged, $2,234.66).
+  it("carries teamClientPrice and stays quiet when it matches the card", () => {
+    const model = closeFromRateCard({
+      pricing: pricing(MEETING_TREE),
+      usage: [ul("meetingtreecomputercom_U8TU_b", null, "COR-COMP-C", 59)],
+      coroInvoiceLines: [inv("Meeting Tree Computer", "COR-COMP-C", 59, "486.75", "2026-08", "9.00")],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.teamClientPrice!.toFixed2()).toBe("9.00");
+    expect(line.findings.filter((f) => f.kind === "CLIENT_PRICE_DIFFERS")).toHaveLength(0);
+  });
+
+  it("flags CLIENT_PRICE_DIFFERS when the team keyed a different bill-out rate", () => {
+    const model = closeFromRateCard({
+      pricing: pricing(SEVEN_STAR),
+      usage: [ul("sevenstarsystemscom_X8E3_b", null, "COR-COMP-C", 10)],
+      coroInvoiceLines: [inv("Seven Star Systems", "COR-COMP-C", 10, "55.50", "2026-08", "8.90")],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.teamClientPrice!.toFixed2()).toBe("8.90");
+    const f = line.findings.filter((x) => x.kind === "CLIENT_PRICE_DIFFERS");
+    expect(f).toHaveLength(1);
+    expect(f[0]!.severity).toBe("warn");
+    expect(f[0]!.message).toMatch(/8\.90/); // team's keyed price
+    expect(f[0]!.message).toMatch(/6\.40/); // the card's col E
+  });
+
+  it("surfaces the team's price on HELD lines (their cost-pass-through practice)", () => {
+    const p = pp("Holdy", "holdycom_aaaa_b", [
+      prow("Coro AI Complete", { list: "15.00", e: null, f: 58, g: 5 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(p),
+      usage: [ul("holdycom_AAAA_b", null, "COR-COMP-C", 4)],
+      coroInvoiceLines: [inv("Holdy", "COR-COMP-C", 4, "22.20", "2026-08", "5.55")],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.unitL).toBeNull(); // still HELD — the team's price is context, not a rate source
+    expect(line.teamClientPrice!.toFixed2()).toBe("5.55");
+    expect(line.findings.filter((f) => f.kind === "MISSING_RATE")).toHaveLength(1);
+  });
+
+  it("leaves teamClientPrice null when invoice lines carry no client price", () => {
+    const model = closeFromRateCard({
+      pricing: pricing(MEETING_TREE),
+      usage: [ul("meetingtreecomputercom_U8TU_b", null, "COR-COMP-C", 59)],
+      coroInvoiceLines: [inv("Meeting Tree Computer", "COR-COMP-C", 59, "486.75")],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.teamClientPrice).toBeNull();
+    expect(line.findings.filter((f) => f.kind === "CLIENT_PRICE_DIFFERS")).toHaveLength(0);
   });
 });
 

@@ -124,6 +124,11 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
       OUT_OF_PERIOD_LINE: 2, // the two July Rocker lines on invoice 2193
       // NO_USAGE_BREAKDOWN gone: the "AVOX LLC" invoice line was always backed
       // by vaimancom usage — the curated map just called it "Vaiman" (fixed).
+      // Every legacy flex line the team keyed in "Coro August Billing.xlsx"
+      // carries a pre-rate-card Client Price that differs from CSV col E
+      // (their own TechLead note: "Still $11/seat; legacy rate unresolved").
+      // Current-gen lines all match. Audit 2026-09-21: $2,234.66/mo delta.
+      CLIENT_PRICE_DIFFERS: 33,
     });
   });
 

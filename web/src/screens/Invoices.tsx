@@ -43,6 +43,7 @@ const ANOMALY_LABELS: Partial<Record<ExceptionKind, string>> = {
   INVOICE_RATE_UNEXPECTED: "rate anomaly",
   ASSUMED_MAPPING: "assumed rate",
   PRODUCT_FALLBACK: "fallback rate",
+  CLIENT_PRICE_DIFFERS: "team billed differently",
 };
 
 function anomalyLabels(findings: readonly Exception[]): string[] {
@@ -254,6 +255,16 @@ function InvoiceLineRow({ line }: { line: DraftLine }) {
         </TD>
         <TD className="text-right tabular">
           {line.unitL !== null ? money(line.unitL) : <span className="text-muted-foreground">—</span>}
+          {line.teamClientPrice !== null &&
+            line.unitL !== null &&
+            !line.teamClientPrice.equalsCents(line.unitL) && (
+              <div
+                className="text-xs text-warning print:hidden"
+                title="The accounting team's workbook (Client Price column) bills this at a different rate than the special-pricing card. The draft uses the card; if the workbook price is the negotiated one, the card needs updating."
+              >
+                team {money(line.teamClientPrice)}
+              </div>
+            )}
         </TD>
         <TD className="text-right tabular">
           {nfr ? (
@@ -269,6 +280,11 @@ function InvoiceLineRow({ line }: { line: DraftLine }) {
                 )?.message ?? "no rate on the card"}
               </div>
               <div className="text-xs">excluded from total</div>
+              {line.teamClientPrice !== null && (
+                <div className="text-xs print:hidden">
+                  team billed {money(line.teamClientPrice)}/unit in the manual workbook
+                </div>
+              )}
               <div className="text-xs text-muted-foreground print:hidden">
                 Fix: ask Coro billing to add this product to the partner's special pricing sheet.
               </div>
