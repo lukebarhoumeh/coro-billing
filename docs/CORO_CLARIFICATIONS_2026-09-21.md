@@ -1,5 +1,9 @@
 # MSP Hub → Coro Billing: open items & clarifications
 
+> **STATUS 2026-09-22 — ANSWERED.** Coro replied by email with a corrected pricing sheet.
+> Adoption, the $1,041.38 credit computation, new-sheet issues, and the remaining call agenda
+> live in [`CORO_REPLY_2026-09-22.md`](CORO_REPLY_2026-09-22.md).
+
 **From:** MSP Hub, LLC (Disti/MSP) — accounting
 **Date:** September 21, 2026
 **References:** Coro Special MSP Pricing (Special Pricing) sheet; Coro invoices INVCUS2026-0001914 (Jul service) and INVCUS2026-0002193 (Aug service); MSP Hub monthly usage reports (August all-partner export; July per-partner "by product" export)
