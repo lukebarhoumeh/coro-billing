@@ -31,6 +31,30 @@ data never leaves this machine via the repo. Still missing: **Jack's special pri
 and download the real workbook) and Lindita's manual workbook (no longer blocking:
 invoice 2193's Invoice Detail tab carries H and L — see `docs/AUGUST_CLOSE_PLAN.md`).
 
+## 2026-09-22 revision (Coro's answers to the clarification letter)
+
+Coro answered `docs/CORO_CLARIFICATIONS_2026-09-21.md` by email on 2026-09-22 and re-sent a
+corrected packet (Luke dropped it in `Desktop\CoroBillingFolder`; adopted here):
+
+- **`2026-08/Coro Special MSP Pricing(Special Pricing).csv` is the corrected sheet and the
+  canonical August rate card.** The prior version is kept as
+  `…(Special Pricing).superseded-2026-09-21.csv`. What changed: adds Net-Tech "BUEmail Flex"
+  and Cyber Construction "Managed Coro Classic" (the two held lines), ForceTech + Rex Black
+  flex rows; fixes Seven Star / DK Systems column-I errors; removes the stray "XTB" alias row.
+  **Hazard we found (reported back to Coro, see `docs/CORO_REPLY_2026-09-22.md`):** on Cyber
+  Construction the old "Coro Classic Flex" row (list $11.99) is now *named* "Modules Flex",
+  while the true modules rate moved to "Coro Module Flex" — the engine carries a
+  signature-guarded override (`src/config/productMap.ts`) until Coro fixes the labels.
+- **The 2026-09-22 usage re-export was REJECTED** and archived as
+  `2026-08/MSP Hub_August 2026 Usage.reexport-2026-09-22.corrupt.xlsx`: its Usage-tab Quantity
+  column is the original file's values **sorted ascending** (289 cells detached from their
+  rows; second broken re-export after the Sep-21 zeroed one). The original
+  `MSP Hub_August 2026 Usage.xlsx` stays canonical; billed quantities come from the Audit
+  strings, which are identical in both files.
+- The signed distributor agreement PDF re-sent in the packet is byte-identical to
+  `agreement/MSP Hub - Coro Hybrid Distributor Agreement (2 tier) V2 after cmnts.docx.pdf`
+  (DocuSign-executed 7/14/2026); the MSRP workbook is byte-identical to the archived copy.
+
 ## Naming convention going forward
 
 Keep vendor filenames when they are unique. If Coro sends another `Copy of …` or `(1)` duplicate, prefix with the invoice month:
