@@ -15,10 +15,10 @@ import { Money } from "../../src/lib/money.js";
 import type { PricingPartner, PricingRow } from "../../src/domain/types.js";
 
 let nextRow = 10;
-function row(product: string, netMsp: string | null): PricingRow {
+function row(product: string, netMsp: string | null, listPrice = "15.00"): PricingRow {
   return {
     product,
-    listPrice: Money.of("15.00"),
+    listPrice: Money.of(listPrice),
     netMsp: netMsp === null ? null : Money.of(netMsp),
     mspDiscountPct: 50,
     hubDiscountPct: 5,
@@ -161,10 +161,11 @@ describe("resolvePricingRow — legacy bundles", () => {
 });
 
 describe("resolvePricingRow — ADD*, NFR, unknowns", () => {
-  it("routes ADDMDRflex through the modules chain as assumed-add", () => {
+  it("routes ADDMDRflex through the modules chain as add-module (confirmed by Coro 2026-09-22)", () => {
     const p = partner("TechLead", [row("Modules Flex", "3.00")]);
     const m = resolvePricingRow(p, "ADDMDRflex");
-    expect(m.kind).toBe("assumed-add");
+    expect(m.kind).toBe("add-module");
+    expect(m.reason).toContain("confirmed by Coro 2026-09-22");
     expect(m.row!.product).toBe("Modules Flex");
   });
 
@@ -186,5 +187,60 @@ describe("resolvePricingRow — ADD*, NFR, unknowns", () => {
     const empty = partner("Empty", []);
     expect(resolvePricingRow(empty, "MODNETWflex").kind).toBe("none");
     expect(resolvePricingRow(empty, "COR-COMP-C").kind).toBe("none");
+  });
+});
+
+describe("resolvePricingRow — 2026-09-22 sheet revision (Coro's answers)", () => {
+  it("maps BUEMAILflex to the new 'BUEmail Flex' spelling (Net-Tech / 1Wire rename)", () => {
+    const nt = partner("Net-Tech", [row("BUEmail Flex", "3.00", "7.50")]);
+    const m = resolvePricingRow(nt, "BUEMAILflex");
+    expect(m.kind).toBe("exact");
+    expect(m.row!.product).toBe("BUEmail Flex");
+  });
+
+  it("maps BUCOCLASSMNflex to the new 'Managed Coro Classic' spelling (Cyber Construction)", () => {
+    const cc = partner("Cyber Construction", [row("Managed Coro Classic", "10.20", "16.99")]);
+    const m = resolvePricingRow(cc, "BUCOCLASSMNflex");
+    expect(m.kind).toBe("exact");
+    expect(m.row!.product).toBe("Managed Coro Classic");
+  });
+
+  it("prefers 'Coro Module Flex' over 'Modules Flex' when both exist (CC label swap)", () => {
+    // On the 2026-09-22 sheet Cyber Construction's row NAMED "Modules Flex" carries the
+    // $11.99 Classic list; the true modules rate lives on "Coro Module Flex".
+    const cc = partner("Cyber Construction", [
+      row("Modules Flex", "7.20", "11.99"),
+      row("Coro Module Flex", "3.00", "7.50"),
+    ]);
+    const m = resolvePricingRow(cc, "MODCLOUDflex");
+    expect(m.kind).toBe("modules-flex");
+    expect(m.row!.product).toBe("Coro Module Flex");
+    expect(m.row!.netMsp!.toFixed2()).toBe("3.00");
+  });
+
+  it("resolves BUCOCLASSflex via the mislabel signature: 'Modules Flex' at exactly $11.99 list", () => {
+    const cc = partner("Cyber Construction", [
+      row("Modules Flex", "7.20", "11.99"),
+      row("Coro Module Flex", "3.00", "7.50"),
+    ]);
+    const m = resolvePricingRow(cc, "BUCOCLASSflex");
+    expect(m.kind).toBe("mislabel-override");
+    expect(m.row!.netMsp!.toFixed2()).toBe("7.20");
+    expect(m.reason).toContain("mislabel");
+  });
+
+  it("mislabel override is signature-guarded: a $7.50-list 'Modules Flex' never matches Classic", () => {
+    const normal = partner("Anyone", [row("Modules Flex", "3.00", "7.50")]);
+    expect(resolvePricingRow(normal, "BUCOCLASSflex").kind).toBe("none");
+  });
+
+  it("a real Classic row beats the mislabel override", () => {
+    const both = partner("Fixed Sheet", [
+      row("Modules Flex", "7.20", "11.99"),
+      row("Coro Classic Flex", "7.20", "11.99"),
+    ]);
+    const m = resolvePricingRow(both, "BUCOCLASSflex");
+    expect(m.kind).toBe("exact");
+    expect(m.row!.product).toBe("Coro Classic Flex");
   });
 });

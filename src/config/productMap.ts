@@ -15,11 +15,15 @@
  *     (Amplivity "Network Flex") beats the generic Modules Flex rate, and
  *     Modsatflex prices from "SAT Flex" where it exists (exactly how Coro billed
  *     Evolve on invoice 2193 line 14).
- *   - ADD*flex (ADDSECUREWEBflex, ADDMDRflex) is ASSUMED to price like modules —
- *     Coro billed Cyber Construction's ADDSECUREWEBflex at the same 2.20 rate as
- *     its MOD lines — but nobody has confirmed it, so matches carry kind
- *     "assumed-add" and the close raises ASSUMED_MAPPING.
- *   - *-NFR codes are not-for-resale: listed, never billed.
+ *   - ADD*flex (ADDSECUREWEBflex, ADDMDRflex) prices like modules — CONFIRMED by
+ *     Coro's 2026-09-22 email ("These are modules and should be billed at the
+ *     module rates"); matches carry kind "add-module", no finding.
+ *   - *-NFR codes are not-for-resale: listed, never billed (confirmed by Coro
+ *     2026-09-22: "NFR is Not for resale and carrie[s] no cost").
+ *   - 2026-09-22 sheet revision: "BUEmail Flex" and "Managed Coro Classic" are
+ *     Coro's new spellings for the two previously-missing rate rows; the generic
+ *     modules chain prefers "Coro Module Flex" and BUCOCLASSflex carries a
+ *     signature-guarded mislabel override — see CLASSIC_MISLABEL below.
  *   - A miss returns kind "none" — NEVER a cross-product or cross-partner
  *     fallback (Dane: "all these partners are on different stuff").
  */
@@ -54,8 +58,24 @@ const MOD_SPECIFIC: Readonly<Record<string, readonly string[]>> = {
   modcloudflex: ["cloud flex"],
 };
 
-/** Generic modules rows, in preference order (both spellings seen in the real CSV). */
-const GENERIC_MODULES: readonly string[] = ["modules flex", "coro module flex"];
+/**
+ * Generic modules rows, in preference order (both spellings seen in the real CSV).
+ * "Coro Module Flex" FIRST since the 2026-09-22 sheet: Cyber Construction is the
+ * only partner carrying both names, and there its "Modules Flex" row is the
+ * mislabeled Classic rate (list $11.99) while "Coro Module Flex" is the true
+ * modules row. Harmless for every other partner (at most one of the two names).
+ */
+const GENERIC_MODULES: readonly string[] = ["coro module flex", "modules flex"];
+
+/**
+ * 2026-09-22 sheet mislabel (Cyber Construction): the row NAMED "Modules Flex"
+ * carrying the Classic list price IS Coro Classic Flex — the old "Coro Classic
+ * Flex" row was renamed in Coro's revision while its values stayed. Signature-
+ * guarded (exact $11.99 Classic list) so a corrected sheet disables this
+ * automatically; a real Classic-named row always wins. Reported to Coro in
+ * docs/CORO_REPLY_2026-09-22.md.
+ */
+const CLASSIC_MISLABEL = { code: "bucoclassflex", rowName: "modules flex", listCents: 1199 } as const;
 /** Current-gen modules row — last resort for MOD codes, surfaced as fallback. */
 const MODULES_CURRENT: readonly string[] = ["coro ai modules"];
 
@@ -66,13 +86,13 @@ const LEGACY_BUNDLES: Readonly<
   bucomflex: { flex: ["complete flex"], current: ["coro ai complete"] },
   bucoroflex: { flex: ["essentials flex"], current: ["coro ai essentials"] },
   bucoclassflex: { flex: ["classic flex", "coro classic flex", "coro classic"], current: [] },
-  bucoclassmnflex: { flex: ["managed classic flex", "classic flex"], current: [] },
+  bucoclassmnflex: { flex: ["managed classic flex", "managed coro classic", "classic flex"], current: [] },
   bucommngflex: {
     flex: ["complete managed flex", "complete flex"],
     current: ["coro ai complete"],
   },
   buendflex: { flex: ["endpoint protection flex"], current: ["coro ai endpoint"] },
-  buemailflex: { flex: ["email protection flex", "email flex"], current: [] },
+  buemailflex: { flex: ["email protection flex", "buemail flex", "email flex"], current: [] },
 };
 
 function findRow(partner: PricingPartner, names: readonly string[]): PricingRow | null {
@@ -135,13 +155,13 @@ export function resolvePricingRow(partner: PricingPartner, vendorSku: string): R
   }
 
   if (code.startsWith("add")) {
-    const m = resolveModulesChain(partner, vendorSku, "assumed-add");
+    const m = resolveModulesChain(partner, vendorSku, "add-module");
     return m.kind === "none"
       ? m
       : {
           ...m,
-          kind: "assumed-add",
-          reason: `${vendorSku} priced via the Modules Flex chain ("${m.row!.product}") — ASSUMED, unconfirmed`,
+          kind: "add-module",
+          reason: `${vendorSku} = Modules Flex (confirmed by Coro 2026-09-22) → "${m.row!.product}"`,
         };
   }
 
@@ -150,6 +170,23 @@ export function resolvePricingRow(partner: PricingPartner, vendorSku: string): R
     const flexRow = findRow(partner, legacy.flex);
     if (flexRow) {
       return { row: flexRow, kind: "exact", reason: `${vendorSku} → "${flexRow.product}"` };
+    }
+    if (code === CLASSIC_MISLABEL.code) {
+      const mislabeled = partner.rows.find(
+        (r) =>
+          normalizeProduct(r.product) === CLASSIC_MISLABEL.rowName &&
+          r.listPrice !== null &&
+          r.listPrice.toCents() === CLASSIC_MISLABEL.listCents
+      );
+      if (mislabeled) {
+        return {
+          row: mislabeled,
+          kind: "mislabel-override",
+          reason:
+            `${vendorSku} → "${mislabeled.product}" via the 2026-09-22 sheet-mislabel signature ` +
+            `(list $11.99 = the Coro Classic Flex rate; ask Coro to fix the label)`,
+        };
+      }
     }
     const currentRow = findRow(partner, legacy.current);
     if (currentRow) {
@@ -169,7 +206,7 @@ export function resolvePricingRow(partner: PricingPartner, vendorSku: string): R
 function resolveModulesChain(
   partner: PricingPartner,
   vendorSku: string,
-  genericKind: "modules-flex" | "assumed-add"
+  genericKind: "modules-flex" | "add-module"
 ): RowMatch {
   const generic = findRow(partner, GENERIC_MODULES);
   if (generic) {

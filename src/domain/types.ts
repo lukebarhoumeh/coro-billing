@@ -222,11 +222,15 @@ export type ExceptionKind =
   | "UNKNOWN_PRODUCT_CODE" // usage product code resolves to no pricing row at all — line HELD
   | "INVOICE_QTY_DISAGREES" // Coro invoice qty != audit-derived usage qty for partner+sku
   | "INVOICE_RATE_UNEXPECTED" // Coro-billed unit cost matches neither the sheet nor the additive rule
-  | "ASSUMED_MAPPING" // ADD*flex priced via the Modules Flex chain — unconfirmed mapping
+  | "ASSUMED_MAPPING" // ADD*flex priced via the Modules Flex chain — unconfirmed mapping (retired 2026-09-22: Coro confirmed)
   | "PRODUCT_FALLBACK" // priced from a fallback row (e.g. BUCOMflex → "Coro AI Complete")
   | "USAGE_NOT_ON_CARD" // usage parent workspace has no special-pricing block
-  | "NFR_LINE" // not-for-resale SKU — listed, never billed
-  | "CLIENT_PRICE_DIFFERS"; // team's keyed bill-out rate ≠ the rate card's col E
+  | "NFR_LINE" // not-for-resale SKU — listed, never billed (confirmed by Coro 2026-09-22)
+  | "CLIENT_PRICE_DIFFERS" // team's keyed bill-out rate ≠ the rate card's col E
+  // --- Coro 2026-09-22 answers (docs/superpowers/specs/2026-09-22-coro-answers-adoption.md) ---
+  | "CLASSIC_RATE_RULE_DISAGREES" // card F/G on a Classic-family row ≠ the confirmed 40/5 (answer c)
+  | "SHEET_MISLABEL_OVERRIDE" // line priced via a curated sheet-mislabel signature — sheet needs fixing
+  | "CREDIT_EXPECTED"; // Coro invoiced above the confirmed additive cost on a legacy line — credit due (answer c)
 
 export interface Exception {
   readonly kind: ExceptionKind;
@@ -382,7 +386,8 @@ export type MatchKind =
   | "modules-flex" // MOD/ADD/SAT code matched a generic modules-flex row
   | "sat-flex" // Modsatflex matched the partner's "SAT Flex" row
   | "fallback-current" // legacy/flex code priced from the current-gen row (surfaced)
-  | "assumed-add" // ADD*flex matched via the modules chain — unconfirmed mapping
+  | "add-module" // ADD*flex priced via the modules chain — confirmed by Coro 2026-09-22
+  | "mislabel-override" // matched via a curated sheet-mislabel signature (see productMap CLASSIC_MISLABEL)
   | "nfr" // not-for-resale — non-billable
   | "none"; // no pricing row at all — the close HOLDS the line
 

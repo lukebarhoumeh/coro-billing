@@ -216,9 +216,10 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
           exception("NFR_LINE", "info", card.name, g.vendorSku, period,
             `${match.reason} (qty ${g.quantity} listed, not billed)`)
         );
-      } else if (match.kind === "assumed-add") {
+      } else if (match.kind === "mislabel-override") {
         flist.push(
-          exception("ASSUMED_MAPPING", "info", card.name, g.vendorSku, period, match.reason)
+          exception("SHEET_MISLABEL_OVERRIDE", "warn", card.name, g.vendorSku, period, match.reason,
+            row?.sourceRow)
         );
       } else if (match.kind === "fallback-current") {
         flist.push(
