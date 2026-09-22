@@ -349,6 +349,60 @@ describe("closeFromRateCard — team Client Price cross-check (Coro August Billi
   });
 });
 
+describe("closeFromRateCard — Classic-family forced cost (Coro 2026-09-22 answer c)", () => {
+  // "Partner discounts do apply to legacy, with the exception of Coro Classic
+  // and Managed Classic (40% to the partner and 45% to MSP Hub regardless)."
+  it("forces Managed Classic cost to list×0.55 and flags a non-40/5 card row", () => {
+    const techlead = pp("TechLead", "techleadcom_aaaa_b", [
+      prow("Managed Classic Flex", { list: "16.99", e: "8.50", f: 50, g: 5, h: "7.65", i: 55 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(techlead),
+      usage: [ul("techleadcom_AAAA_b", null, "BUCOCLASSMNflex", 10)],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.expectedHAdditive!.toFixed2()).toBe("9.34"); // 16.99×0.55, NOT 16.99×0.45
+    const f = line.findings.filter((x) => x.kind === "CLASSIC_RATE_RULE_DISAGREES");
+    expect(f).toHaveLength(1);
+    expect(f[0]!.severity).toBe("info");
+    expect(f[0]!.message).toMatch(/45%/);
+    // margin (no invoice loaded) uses the forced additive at full precision:
+    // 85.00 − 16.99×0.55×10 = 85.00 − 93.445 = −8.445 → −8.44 displayed
+    expect(line.marginBasis).toBe("expected-additive");
+    expect(line.margin!.toFixed2()).toBe("-8.44");
+  });
+
+  it("stays quiet on a compliant 40/5 Classic row (same number both ways)", () => {
+    const cc = pp("Cyber Construction", "cyber-constructioncom_x3e7_b", [
+      prow("Managed Coro Classic", { list: "16.99", e: "10.20", f: 40, g: 5, h: "9.35", i: 45 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(cc),
+      usage: [ul("cyber-constructioncom_X3E7_b", null, "BUCOCLASSMNflex", 10)],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.unitL!.toFixed2()).toBe("10.20");
+    expect(line.expectedHAdditive!.toFixed2()).toBe("9.34");
+    expect(line.findings.filter((x) => x.kind === "CLASSIC_RATE_RULE_DISAGREES")).toHaveLength(0);
+  });
+
+  it("does not force non-Classic legacy codes", () => {
+    const p = pp("Evolve", "evolvecom_aaaa_b", [
+      prow("Complete Flex", { list: "15.00", e: "7.90", f: 47, g: 5, h: "7.51", i: 52 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(p),
+      usage: [ul("evolvecom_AAAA_b", null, "BUCOMflex", 4)],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.expectedHAdditive!.toFixed2()).toBe("7.20"); // 15×0.48 — card F+G as-is
+    expect(line.findings.filter((x) => x.kind === "CLASSIC_RATE_RULE_DISAGREES")).toHaveLength(0);
+  });
+});
+
 describe("closeFromRateCard — customer breakdown, rated lines, determinism", () => {
   it("keeps per-customer shares and emits per-customer rated lines", () => {
     const model = closeFromRateCard({

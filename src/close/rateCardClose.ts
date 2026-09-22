@@ -56,6 +56,15 @@ export interface RateCardCloseArgs {
 /** One cent — the tolerance for "the billed unit rate matches an expected rule". */
 const UNIT_TOLERANCE_CENTS = 1;
 
+/**
+ * Coro 2026-09-22 answer (c): Coro Classic & Managed Classic cost MSP Hub a flat
+ * 45% off list "regardless" — the one legacy family where partner-specific F/G
+ * do NOT apply. Forced below so cost, credits and the invoice cross-check all
+ * follow the confirmed rule; card drift surfaces as CLASSIC_RATE_RULE_DISAGREES
+ * instead of skewing cost.
+ */
+const CLASSIC_FLAT_SKUS: ReadonlySet<string> = new Set(["bucoclassflex", "bucoclassmnflex"]);
+
 function exception(
   kind: Exception["kind"],
   severity: Exception["severity"],
@@ -240,10 +249,32 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       // --- both cost rules ---
       const expectedHSheet =
         row === null ? null : (row.netHubStated ?? (row.netMsp !== null ? row.netMsp.mul("0.95") : null));
-      const expectedHAdditive =
+      let expectedHAdditive =
         row !== null && row.listPrice !== null && row.mspDiscountPct !== null && row.hubDiscountPct !== null
           ? row.listPrice.applyDiscount((row.mspDiscountPct + row.hubDiscountPct) / 100)
           : null;
+      if (
+        billable &&
+        CLASSIC_FLAT_SKUS.has(g.vendorSku.trim().toLowerCase()) &&
+        row !== null &&
+        row.listPrice !== null
+      ) {
+        const forced = row.listPrice.applyDiscount(0.45);
+        if (
+          row.mspDiscountPct !== null &&
+          row.hubDiscountPct !== null &&
+          row.mspDiscountPct + row.hubDiscountPct !== 45
+        ) {
+          flist.push(
+            exception("CLASSIC_RATE_RULE_DISAGREES", "info", card.name, g.vendorSku, period,
+              `card says ${row.mspDiscountPct}%+${row.hubDiscountPct}% but Coro confirmed the ` +
+                `Classic family costs MSP Hub a flat 45% off list regardless (2026-09-22 answer c) ` +
+                `— using ${forced.toFixed2()}/unit; the card row needs correcting`,
+              row.sourceRow)
+          );
+        }
+        expectedHAdditive = forced;
+      }
 
       // --- invoice actuals + cross-check findings ---
       let actualHAmount: Money | null = null;
