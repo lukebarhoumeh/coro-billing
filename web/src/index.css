@@ -161,20 +161,15 @@ body::before {
     left: 0;
     top: 0;
     width: 100%;
-    background: #fff !important;
-    color: #111 !important;
-    border: none !important;
     border-radius: 0;
     box-shadow: none !important;
-    padding: 0;
   }
+  /* The document is natively paper-styled (navy/gold on white — Luke's
+   * template); print its colors EXACTLY instead of stripping them. */
+  .print-invoice,
   .print-invoice * {
-    background: transparent !important;
-    color: #111 !important;
-    border-color: #ddd !important;
-    box-shadow: none !important;
-    /* The Table primitive wraps tables in an overflow-auto div; scroll
-     * containers can clip page-spanning content when printing. */
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     overflow: visible !important;
   }
   /* The app shell scrolls; let the document flow across pages when printing. */

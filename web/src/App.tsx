@@ -46,11 +46,11 @@ const SECTIONS: readonly Section[] = [
   { key: "exceptions", label: "Exceptions", icon: TriangleAlert, Screen: ExceptionsScreen, needsModel: true },
 ];
 
-/** Brass ledger mark — the workbench's brand glyph. */
+/** The real MSPHUB wordmark on a white chip (the brand asset is blue-on-white). */
 function Mark() {
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-md border border-primary/40 bg-primary/10">
-      <span className="figure text-base leading-none text-primary">Ⅼ</span>
+    <div className="inline-flex items-center rounded-md bg-white px-2.5 py-2 shadow-sm">
+      <img src="/brand/msphub-logo.jpeg" alt="MSP Hub" className="h-4 w-auto" />
     </div>
   );
 }
@@ -110,7 +110,7 @@ export default function App() {
             <Mark />
             <div>
               <div className="font-display text-[15px] font-semibold tracking-tight">
-                MSP Hub <span className="text-primary">·</span> Coro Billing
+                Coro Billing
               </div>
               <div className="microlabel mt-0.5">Close workbench</div>
             </div>
