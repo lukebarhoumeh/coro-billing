@@ -61,6 +61,8 @@ export function buildCloseWorkbook(
     "GM %": p.totalL.isZero()
       ? null
       : Math.round((p.totalMargin.toNumber() / p.totalL.toNumber()) * 1000) / 10,
+    // Coro over-billed legacy lines awaiting credit memos (2026-09-22 answer c).
+    "Credit Expected": num(p.totalCreditExpected),
     "Held lines": p.heldLines,
     Status: review[p.slug]?.status ?? "unreviewed",
     Note: review[p.slug]?.note ?? "",
@@ -89,6 +91,7 @@ export function buildCloseWorkbook(
         "Team Client Price": num(line.teamClientPrice),
         Margin: num(line.margin),
         Basis: line.marginBasis,
+        "Credit Expected": num(line.creditExpected),
         Match: line.matchKind,
         Findings: line.findings.map((f) => f.kind).join(", "),
       });
@@ -107,6 +110,7 @@ export function buildCloseWorkbook(
           "Team Client Price": null,
           Margin: null,
           Basis: "",
+          "Credit Expected": null,
           Match: "",
           Findings: "",
         });
@@ -128,6 +132,7 @@ export function buildCloseWorkbook(
         ? null
         : Math.round((p.totalMargin.toNumber() / p.totalL.toNumber()) * 1000) / 10,
       Basis: "",
+      "Credit Expected": num(p.totalCreditExpected),
       Match: "",
       Findings: p.heldLines > 0 ? `${p.heldLines} HELD line(s) excluded` : "",
     });

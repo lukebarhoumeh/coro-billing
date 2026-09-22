@@ -38,6 +38,10 @@ const SECTION_FOR_KIND: Partial<Record<ExceptionKind, SectionKey>> = {
   ASSUMED_MAPPING: "invoices",
   PRODUCT_FALLBACK: "invoices",
   CLIENT_PRICE_DIFFERS: "invoices",
+  // Coro 2026-09-22 answers:
+  CREDIT_EXPECTED: "reconcile", // over-billed legacy line — chase the Coro credit memo
+  CLASSIC_RATE_RULE_DISAGREES: "ratecards", // card row drifts from the flat-45 Classic rule
+  SHEET_MISLABEL_OVERRIDE: "ratecards", // priced via the curated mislabel signature
 };
 
 type Severity = Exception["severity"];

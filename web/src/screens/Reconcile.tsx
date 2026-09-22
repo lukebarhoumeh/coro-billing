@@ -22,7 +22,8 @@ const MATCH_LABEL: Partial<Record<MatchKind, string>> = {
   "modules-flex": "modules flex",
   "sat-flex": "SAT flex",
   "fallback-current": "fallback",
-  "assumed-add": "assumed",
+  "add-module": "module",
+  "mislabel-override": "mislabel fix",
   nfr: "NFR",
   none: "no rate",
 };
@@ -68,9 +69,14 @@ function ProductRow({ line }: { line: DraftLine }) {
         {delta === null ? "—" : delta > 0 ? `+${delta.toLocaleString()}` : delta.toLocaleString()}
       </TD>
       <TD>
-        {matchLabel !== undefined && (
-          <Badge variant={line.matchKind === "none" ? "warning" : "muted"}>{matchLabel}</Badge>
-        )}
+        <span className="inline-flex flex-wrap items-center gap-1">
+          {matchLabel !== undefined && (
+            <Badge variant={line.matchKind === "none" ? "warning" : "muted"}>{matchLabel}</Badge>
+          )}
+          {line.creditExpected !== null && (
+            <Badge variant="warning">credit ${line.creditExpected.toFixed2()}</Badge>
+          )}
+        </span>
       </TD>
     </TR>
   );

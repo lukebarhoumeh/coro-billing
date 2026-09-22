@@ -12,8 +12,20 @@ const ENTRIES: readonly { term: string; def: string }[] = [
     def: 'What the MSP partner pays MSP Hub per unit — column E, "Net Price to MSP", on Coro\'s special pricing sheet. Every draft invoice line uses this. It is read from the sheet, never computed.',
   },
   {
-    term: "Our cost — two rules",
-    def: "The pricing sheet implies our cost is the partner price × 0.95 (“sheet rule”). Coro's real invoices instead stack the discounts additively off list price (“additive rule” — a 58%+5% partner is billed at 63% off). When you load the Coro invoice, its actual billed amounts win. Where the rules disagree, the platform shows both — it never silently picks.",
+    term: "Our cost — the additive rule (confirmed)",
+    def: "Coro confirmed (2026-09-22) that our cost is the discounts stacked additively off list price: partner % + our additional % (45 minus the partner's, floored at 5) — a 58%+5% partner is billed at 63% off. The sheet's col H mostly still carries the older partner-price × 0.95 reading; it's shown as reference only. When you load the Coro invoice, its actual billed amounts win.",
+  },
+  {
+    term: "Classic exception",
+    def: "Coro Classic and Managed Classic are the one legacy family where partner-specific discounts do NOT apply to our cost: flat 45% off list regardless (Coro, 2026-09-22). Where a partner's card row says otherwise, the platform uses the flat rule and flags the row.",
+  },
+  {
+    term: "Credit expected",
+    def: "Coro confirmed partner-specific discounts apply to legacy flex — but their invoices billed those lines at the flat legacy rate, which over-charged us. Each over-billed line shows the credit due (Coro says credits are in progress). GP stays cash-true until the credit memo lands; the after-credits figure is shown alongside.",
+  },
+  {
+    term: "“Mislabel fix”",
+    def: "Coro's corrected sheet renamed Cyber Construction's Coro Classic Flex row to “Modules Flex” ($11.99 list). The platform recognizes the mislabel by its exact list price, prices Classic usage from it, and flags every such line until Coro fixes the label.",
   },
   {
     term: "GP / GM",

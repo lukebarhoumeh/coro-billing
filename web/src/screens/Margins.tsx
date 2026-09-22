@@ -505,6 +505,16 @@ export function MarginsScreen(props: ScreenProps) {
             }
             valueClass={gpNegative ? "text-danger" : "text-success"}
           />
+          {!model.totalCreditExpected.isZero() && (
+            <BridgeRow
+              label="+ Credits"
+              sub="Coro over-bills pending credit (2026-09-22 answer c)"
+              value={money(model.totalCreditExpected)}
+              widthPct={bridgeW(model.totalCreditExpected)}
+              barClass="bg-gradient-to-r from-warning/70 to-warning/40"
+              valueClass="text-warning"
+            />
+          )}
           <p className="text-xs text-muted-foreground">
             Cost basis: Coro-invoice <span className="text-foreground">actual</span> for{" "}
             <span className="tabular">{bridge.actualPartners}</span> partner
@@ -512,6 +522,15 @@ export function MarginsScreen(props: ScreenProps) {
             <span className="text-foreground">expected additive</span> for{" "}
             <span className="tabular">{bridge.expectedPartners}</span>. GP = billed − cost, GM{" "}
             <span className="tabular">{gmPct(bridge.gp, bridge.billed)}</span> of billed.
+            {!model.totalCreditExpected.isZero() && (
+              <>
+                {" "}After the pending Coro credits land, GP becomes{" "}
+                <span className="tabular text-foreground">
+                  {money(bridge.gp.add(model.totalCreditExpected))}
+                </span>
+                .
+              </>
+            )}
           </p>
         </CardContent>
       </Card>

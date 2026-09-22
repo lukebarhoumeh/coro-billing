@@ -248,6 +248,14 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
             </span>
             <span className="microlabel">of billed</span>
           </div>
+          {!model.totalCreditExpected.isZero() && (
+            <div className="text-xs text-muted-foreground">
+              Coro credits pending{" "}
+              <span className="tabular text-warning">{money(model.totalCreditExpected)}</span> —
+              after credits{" "}
+              <span className="tabular">{money(a.margin.add(model.totalCreditExpected))}</span>
+            </div>
+          )}
         </Kpi>
 
         <Kpi icon={Users} title="Partners">
@@ -474,18 +482,18 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Scale className="h-4 w-4 shrink-0 text-primary" />
-            Two cost rules — sheet vs Coro's additive billing
+            Two cost rules — sheet col H vs the confirmed additive rule
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pt-2">
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <div className="microlabel">Sheet rule (col H)</div>
+              <div className="microlabel">Sheet col H (reference)</div>
               <div className="figure tabular mt-1 text-2xl">{money(a.sheetTotal)}</div>
-              <div className="text-xs text-muted-foreground">MSP price × 0.95</div>
+              <div className="text-xs text-muted-foreground">as written (mostly E × 0.95)</div>
             </div>
             <div>
-              <div className="microlabel">Additive rule</div>
+              <div className="microlabel">Additive rule (canonical)</div>
               <div className="figure tabular mt-1 text-2xl">{money(a.additiveTotal)}</div>
               <div className="text-xs text-muted-foreground">list × (1 − total discount)</div>
             </div>
@@ -509,10 +517,13 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
             </div>
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            The pricing sheet computes our cost as MSP price × 0.95, but Coro's real invoices stack
-            the discounts additively off list, which is cheaper — e.g. a 58% + 5% partner is billed
-            at 63% off list. When a Coro invoice is loaded, its actuals are authoritative; until
-            then, both rules are shown and neither is presented as "the" cost where they disagree.
+            Coro confirmed the additive rule as the intended cost (2026-09-22): total discount =
+            partner % + MSP Hub's additional % (45 − partner, floored at 5), applied off list — e.g.
+            a 58% + 5% partner is billed at 63% off list. Coro Classic and Managed Classic are the
+            exception: a flat 45% off list regardless of partner. The sheet's col H column still
+            mostly carries the older MSP price × 0.95 reading and is shown as reference only. When a
+            Coro invoice is loaded, its actuals are authoritative — legacy lines Coro billed above
+            the additive rule carry an expected credit (answer c).
           </p>
         </CardContent>
       </Card>
