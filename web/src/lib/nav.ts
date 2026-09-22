@@ -7,6 +7,7 @@ export type SectionKey =
   | "ratecards"
   | "reconcile"
   | "invoices"
+  | "margins"
   | "exceptions";
 
 /** Props every data screen receives; screens read the model via useClose(). */

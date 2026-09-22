@@ -14,6 +14,7 @@ import {
   BadgeDollarSign,
   Scale,
   FileText,
+  TrendingUp,
   TriangleAlert,
   ShieldAlert,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { OverviewScreen } from "@/screens/Overview";
 import { RateCardsScreen } from "@/screens/RateCards";
 import { ReconcileScreen } from "@/screens/Reconcile";
 import { InvoicesScreen } from "@/screens/Invoices";
+import { MarginsScreen } from "@/screens/Margins";
 import { ExceptionsScreen } from "@/screens/Exceptions";
 
 interface Section {
@@ -43,6 +45,7 @@ const SECTIONS: readonly Section[] = [
   { key: "ratecards", label: "Rate Cards", icon: BadgeDollarSign, Screen: RateCardsScreen, needsModel: true },
   { key: "reconcile", label: "Reconcile", icon: Scale, Screen: ReconcileScreen, needsModel: true },
   { key: "invoices", label: "Invoices", icon: FileText, Screen: InvoicesScreen, needsModel: true },
+  { key: "margins", label: "Margins", icon: TrendingUp, Screen: MarginsScreen, needsModel: true },
   { key: "exceptions", label: "Exceptions", icon: TriangleAlert, Screen: ExceptionsScreen, needsModel: true },
 ];
 

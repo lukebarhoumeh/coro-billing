@@ -23,7 +23,7 @@ import { Money, sum } from "@pipeline/lib/money.js";
 import type { CloseModel, PartnerDraft } from "@pipeline/domain/types.js";
 import { useClose } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
-import { money, gmPct } from "@/lib/format";
+import { money, gmPct, pct } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, severityVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,32 @@ import { cn } from "@/lib/cn";
 
 const SEVERITIES = ["block", "warn", "info"] as const;
 
+/** One segment of the GP-concentration strip (a positive-GP partner, or "others"). */
+interface GpSegment {
+  readonly key: string;
+  readonly label: string;
+  readonly gp: Money;
+  /** 0..1 share of total positive GP. */
+  readonly share: number;
+}
+
+/** Deterministic segment tones (position-keyed, never meaning-keyed — labels carry meaning). */
+const GP_SEGMENT_TONES = [
+  { bg: "bg-primary/85", text: "text-primary-foreground" },
+  { bg: "bg-primary/60", text: "text-primary-foreground" },
+  { bg: "bg-accent/60", text: "text-accent-foreground" },
+  { bg: "bg-accent/35", text: "text-foreground" },
+  { bg: "bg-success/50", text: "text-success-foreground" },
+] as const;
+const GP_OTHERS_TONE = { bg: "bg-muted", text: "text-muted-foreground" } as const;
+
 interface Aggregates {
   readonly billed: Money;
   readonly costExpected: Money;
-  readonly costActual: Money | null;
+  /** Actual-else-additive per partner — the same basis as every GP figure. */
+  readonly costBlended: Money;
+  /** How many partners the blend priced from a Coro-invoice actual. */
+  readonly costActualPartners: number;
   readonly margin: Money;
   readonly severityCounts: Readonly<Record<(typeof SEVERITIES)[number], number>>;
   readonly byBilled: readonly PartnerDraft[];
@@ -44,15 +66,21 @@ interface Aggregates {
   readonly rulesDelta: Money;
   readonly heldTotal: number;
   readonly heldPartners: readonly PartnerDraft[];
+  /** Positive-GP partners' share of total positive GP: top 5 + "others". */
+  readonly gpSegments: readonly GpSegment[];
+  /** min(3, positive-GP partner count) — for the concentration caption. */
+  readonly gpTopCount: number;
+  /** 0..1 share of positive GP carried by the top gpTopCount partners; null if none. */
+  readonly gpTopShare: number | null;
 }
 
 function aggregate(model: CloseModel): Aggregates {
   const billed = sum(model.partners.map((p) => p.totalL));
   const costExpected = sum(model.partners.map((p) => p.totalHExpected));
-  const actuals = model.partners
-    .map((p) => p.totalHActual)
-    .filter((h): h is Money => h !== null);
-  const costActual = actuals.length > 0 ? sum(actuals) : null;
+  // Cost basis: Coro-invoice actual where loaded, expected additive otherwise —
+  // per partner, the same actual-else-additive blend behind every margin figure.
+  const costBlended = sum(model.partners.map((p) => p.totalHActual ?? p.totalHExpected));
+  const costActualPartners = model.partners.filter((p) => p.totalHActual !== null).length;
   const margin = sum(model.partners.map((p) => p.totalMargin));
 
   const severityCounts = { block: 0, warn: 0, info: 0 };
@@ -79,10 +107,42 @@ function aggregate(model: CloseModel): Aggregates {
   const heldPartners = model.partners.filter((p) => p.heldLines > 0);
   const heldTotal = heldPartners.reduce((n, p) => n + p.heldLines, 0);
 
+  // GP concentration: positive-GP partners only, sorted by GP desc (slug tiebreak
+  // for determinism). Cent arithmetic via toCents() — display always via money()/pct().
+  const positives = model.partners
+    .filter((p) => p.totalMargin.toCents() > 0)
+    .sort(
+      (x, y) => y.totalMargin.toCents() - x.totalMargin.toCents() || x.slug.localeCompare(y.slug)
+    );
+  const positiveGpCents = positives.reduce((n, p) => n + p.totalMargin.toCents(), 0);
+  const gpSegments: GpSegment[] = positives.slice(0, 5).map((p) => ({
+    key: p.slug,
+    label: p.cardName,
+    gp: p.totalMargin,
+    share: positiveGpCents > 0 ? p.totalMargin.toCents() / positiveGpCents : 0,
+  }));
+  const rest = positives.slice(5);
+  if (rest.length > 0) {
+    const restGp = sum(rest.map((p) => p.totalMargin));
+    gpSegments.push({
+      key: "__others",
+      label: `${rest.length} others`,
+      gp: restGp,
+      share: positiveGpCents > 0 ? restGp.toCents() / positiveGpCents : 0,
+    });
+  }
+  const gpTopCount = Math.min(3, positives.length);
+  const gpTopShare =
+    positiveGpCents > 0
+      ? positives.slice(0, gpTopCount).reduce((n, p) => n + p.totalMargin.toCents(), 0) /
+        positiveGpCents
+      : null;
+
   return {
     billed,
     costExpected,
-    costActual,
+    costBlended,
+    costActualPartners,
     margin,
     severityCounts,
     byBilled,
@@ -92,6 +152,9 @@ function aggregate(model: CloseModel): Aggregates {
     rulesDelta: sheetTotal.sub(additiveTotal),
     heldTotal,
     heldPartners,
+    gpSegments,
+    gpTopCount,
+    gpTopShare,
   };
 }
 
@@ -147,19 +210,21 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
         </Kpi>
 
         <Kpi icon={Receipt} title="Our cost">
-          {a.costActual !== null ? (
+          <div className="figure tabular text-3xl">{money(a.costBlended)}</div>
+          {a.costActualPartners > 0 ? (
             <>
-              <div className="figure tabular text-3xl">{money(a.costActual)}</div>
-              <div className="text-xs text-muted-foreground">actual (Coro invoice)</div>
               <div className="text-xs text-muted-foreground">
-                expected <span className="tabular">{money(a.costExpected)}</span> (additive rule)
+                {a.costActualPartners === model.partners.length
+                  ? "actual (Coro invoice)"
+                  : `actual (Coro invoice) for ${a.costActualPartners} of ${model.partners.length} partners, expected for the rest`}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                all-expected <span className="tabular">{money(a.costExpected)}</span> (additive
+                rule)
               </div>
             </>
           ) : (
-            <>
-              <div className="figure tabular text-3xl">{money(a.costExpected)}</div>
-              <div className="text-xs text-muted-foreground">expected (additive rule)</div>
-            </>
+            <div className="text-xs text-muted-foreground">expected (additive rule)</div>
           )}
         </Kpi>
 
@@ -208,11 +273,73 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
         </Kpi>
       </div>
 
+      {/* GP concentration — who carries the month's positive gross profit.
+          100%-stacked strip (pure divs); the GP-by-partner table below is the
+          full text alternative, and every segment carries its detail in title. */}
+      {a.gpSegments.length > 0 && (
+        <Card
+          className="rise"
+          data-testid="gp-concentration"
+          style={{ "--rise-i": 2 } as React.CSSProperties}
+        >
+          <CardContent className="space-y-2.5 p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <span className="microlabel">GP concentration — share of positive gross profit</span>
+              <span className="text-xs text-muted-foreground">
+                top {a.gpTopCount} partner{a.gpTopCount === 1 ? "" : "s"}{" "}
+                {a.gpTopCount === 1 ? "carries" : "carry"}{" "}
+                <span className="tabular font-medium text-foreground">
+                  {pct(a.gpTopShare ?? undefined)}
+                </span>{" "}
+                of gross profit
+              </span>
+            </div>
+            <div
+              role="img"
+              aria-label={`Share of positive gross profit: ${a.gpSegments
+                .map((s) => `${s.label} ${pct(s.share)}`)
+                .join(", ")}`}
+              className="flex h-5 w-full overflow-hidden rounded-full bg-muted/30"
+            >
+              {a.gpSegments.map((seg, i) => {
+                const tone =
+                  seg.key === "__others"
+                    ? GP_OTHERS_TONE
+                    : GP_SEGMENT_TONES[Math.min(i, GP_SEGMENT_TONES.length - 1)]!;
+                return (
+                  <div
+                    key={seg.key}
+                    title={`${seg.label} — ${money(seg.gp)} GP · ${pct(seg.share)} of positive GP`}
+                    style={{ width: `${seg.share * 100}%` }}
+                    className={cn(
+                      "flex min-w-0 items-center justify-center overflow-hidden",
+                      "border-r border-background/60 last:border-r-0",
+                      tone.bg
+                    )}
+                  >
+                    {seg.share >= 0.12 && (
+                      <span
+                        className={cn(
+                          "truncate px-1.5 text-[10px] font-semibold leading-none",
+                          tone.text
+                        )}
+                      >
+                        {seg.label} · <span className="tabular">{pct(seg.share)}</span>
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Held lines — loud, amber, above the fold. */}
       {a.heldTotal > 0 && (
         <Card
           className="rise border-warning/40 bg-warning/5"
-          style={{ "--rise-i": 2 } as React.CSSProperties}
+          style={{ "--rise-i": 3 } as React.CSSProperties}
         >
           <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
             <div className="flex items-start gap-3">
@@ -242,15 +369,53 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
       )}
 
       {/* GP by partner */}
-      <Card className="rise" style={{ "--rise-i": 3 } as React.CSSProperties}>
-        <CardHeader>
+      <Card className="rise" style={{ "--rise-i": 4 } as React.CSSProperties}>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <CardTitle>GP by partner</CardTitle>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {/* Legend: cost is inset over billed on one scale — the brass remainder is GP. */}
+            <span className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-4 rounded-full bg-gradient-to-r from-primary/70 to-primary/30"
+                />
+                billed
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className="relative h-2 w-4 overflow-hidden rounded-full bg-primary/60"
+                >
+                  <span className="absolute inset-0 bg-accent/30" />
+                </span>
+                cost
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden="true" className="h-2 w-4 rounded-full bg-primary/45" />
+                GP (remainder)
+              </span>
+            </span>
+            <Button
+              variant="ghost"
+              className="h-auto px-2 py-1 text-xs text-primary hover:text-primary"
+              onClick={() => onNavigate("margins")}
+            >
+              Margins →
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="pt-2">
           <div className="divide-y divide-border/60">
             {a.byBilled.map((p) => {
               const widthPct =
                 a.maxBilledCents > 0 ? (p.totalL.toCents() / a.maxBilledCents) * 100 : 0;
+              const cost = p.totalHActual ?? p.totalHExpected;
+              const costBasis = p.totalHActual !== null ? "actual" : "expected";
+              const costPct =
+                a.maxBilledCents > 0
+                  ? Math.min(100, (cost.toCents() / a.maxBilledCents) * 100)
+                  : 0;
               const gpNegative = p.totalMargin.isNegative();
               return (
                 <button
@@ -258,13 +423,19 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
                   data-testid={`margin-row-${p.slug}`}
                   onClick={() => onNavigate("invoices", p.slug)}
                   className="flex w-full items-center gap-3 px-1 py-2 text-left text-sm transition-colors hover:bg-muted/40"
-                  title={`Open ${p.cardName}'s draft invoice`}
+                  title={`${p.cardName} — billed ${money(p.totalL)} · cost ${money(cost)} (${costBasis}) · GP ${money(p.totalMargin)}. Open the draft invoice.`}
                 >
                   <span className="w-44 shrink-0 truncate font-medium">{p.cardName}</span>
-                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted/60">
+                  {/* Paired bar, one scale: brass = billed; the darker inset overlay is
+                      cost; the un-shaded brass remainder IS the GP. */}
+                  <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-muted/60">
                     <span
-                      className="block h-full rounded-full bg-gradient-to-r from-primary/70 to-primary/30"
+                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary/70 to-primary/30"
                       style={{ width: `${widthPct}%` }}
+                    />
+                    <span
+                      className="absolute inset-y-[2px] left-0 rounded-full bg-accent/30"
+                      style={{ width: `${costPct}%` }}
                     />
                   </span>
                   <span className="w-28 shrink-0 text-right tabular">{money(p.totalL)}</span>
@@ -285,16 +456,21 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
               );
             })}
           </div>
-          <div className="mt-2 flex justify-end gap-3 px-1">
-            <span className="microlabel w-28 text-right">billed</span>
-            <span className="microlabel w-28 text-right">GP</span>
-            <span className="microlabel w-16 text-right">GM</span>
+          <div className="mt-2 flex items-baseline justify-between gap-3 px-1">
+            <span className="text-[11px] text-muted-foreground">
+              cost is actual (Coro invoice) when loaded, else expected (additive rule)
+            </span>
+            <span className="flex gap-3">
+              <span className="microlabel w-28 text-right">billed</span>
+              <span className="microlabel w-28 text-right">GP</span>
+              <span className="microlabel w-16 text-right">GM</span>
+            </span>
           </div>
         </CardContent>
       </Card>
 
       {/* Two cost rules */}
-      <Card className="rise" style={{ "--rise-i": 4 } as React.CSSProperties}>
+      <Card className="rise" style={{ "--rise-i": 5 } as React.CSSProperties}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Scale className="h-4 w-4 shrink-0 text-primary" />
