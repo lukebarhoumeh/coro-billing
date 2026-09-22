@@ -403,6 +403,85 @@ describe("closeFromRateCard — Classic-family forced cost (Coro 2026-09-22 answ
   });
 });
 
+describe("closeFromRateCard — CREDIT_EXPECTED (Coro 2026-09-22 answer c)", () => {
+  // Coro's invoices billed legacy flex at the flat legacy rate; answer (c)
+  // confirms partner-specific discounts apply — those lines were over-billed
+  // and "our team had been crediting/working to credit MSP Hub".
+  const TECHLEAD = pp("TechLead", "techleadcom_aaaa_b", [
+    prow("Complete Managed Flex", { list: "20.00", e: "10.00", f: 50, g: 5, h: "9.00", i: 55 }),
+    prow("Modules Flex", { list: "7.50", e: "3.00", f: 60, g: 5, h: "2.63", i: 65 }),
+  ]);
+
+  it("quantifies the credit on an over-billed legacy line and skips INVOICE_RATE_UNEXPECTED", () => {
+    const model = closeFromRateCard({
+      pricing: pricing(TECHLEAD),
+      usage: [ul("techleadcom_AAAA_b", null, "BUCOMMNGflex", 10)],
+      // Coro billed the flat legacy rate $11.00 (= 20×0.55), card additive says $9.00
+      coroInvoiceLines: [inv("TechLead", "BUCOMMNGflex", 10, "110.00")],
+      period: "2026-08",
+    });
+    const draft = model.partners[0]!;
+    const line = draft.lines[0]!;
+    expect(line.creditExpected!.toFixed2()).toBe("20.00"); // 110.00 − 9.00×10
+    const f = line.findings.filter((x) => x.kind === "CREDIT_EXPECTED");
+    expect(f).toHaveLength(1);
+    expect(f[0]!.severity).toBe("warn");
+    expect(f[0]!.message).toMatch(/answer \(c\)/);
+    expect(f[0]!.message).toMatch(/20\.00/);
+    expect(line.findings.filter((x) => x.kind === "INVOICE_RATE_UNEXPECTED")).toHaveLength(0);
+    // margin stays cash-true (actual basis) — the credit is separate context
+    expect(line.marginBasis).toBe("actual");
+    expect(line.margin!.toFixed2()).toBe("-10.00"); // 100.00 − 110.00
+    expect(draft.totalCreditExpected.toFixed2()).toBe("20.00");
+    expect(model.totalCreditExpected.toFixed2()).toBe("20.00");
+  });
+
+  it("leaves an under-billed legacy line as INVOICE_RATE_UNEXPECTED with no credit", () => {
+    const model = closeFromRateCard({
+      pricing: pricing(TECHLEAD),
+      usage: [ul("techleadcom_AAAA_b", null, "MODNETWflex", 10)],
+      // Coro billed $2.20 (flat legacy modules) — BELOW the card additive $2.625;
+      // open call question (legacy $4.00 list vs the sheet's $7.50 row), not a credit
+      coroInvoiceLines: [inv("TechLead", "MODNETWflex", 10, "22.00")],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.creditExpected).toBeNull();
+    expect(line.findings.filter((x) => x.kind === "CREDIT_EXPECTED")).toHaveLength(0);
+    expect(line.findings.filter((x) => x.kind === "INVOICE_RATE_UNEXPECTED")).toHaveLength(1);
+    expect(model.totalCreditExpected.toFixed2()).toBe("0.00");
+  });
+
+  it("never credits a current-gen line — off-rate stays INVOICE_RATE_UNEXPECTED", () => {
+    const model = closeFromRateCard({
+      pricing: pricing(MEETING_TREE),
+      usage: [ul("meetingtreecomputercom_U8TU_b", null, "COR-COMP-C", 59)],
+      // over the additive 8.25 AND the sheet 8.55, but current-gen ⇒ no credit rule
+      coroInvoiceLines: [inv("Meeting Tree Computer", "COR-COMP-C", 59, "531.00")],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.creditExpected).toBeNull();
+    expect(line.findings.filter((x) => x.kind === "CREDIT_EXPECTED")).toHaveLength(0);
+    expect(line.findings.filter((x) => x.kind === "INVOICE_RATE_UNEXPECTED")).toHaveLength(1);
+  });
+
+  it("a compliant Classic line (forced 45%) yields no credit — Coro's flat rate IS the agreed cost", () => {
+    const cc = pp("Cyber Construction", "cyber-constructioncom_x3e7_b", [
+      prow("Managed Coro Classic", { list: "16.99", e: "10.20", f: 40, g: 5, h: "9.35", i: 45 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(cc),
+      usage: [ul("cyber-constructioncom_X3E7_b", null, "BUCOCLASSMNflex", 10)],
+      coroInvoiceLines: [inv("Cyber Construction", "BUCOCLASSMNflex", 10, "93.45")], // 9.345/unit
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.creditExpected).toBeNull(); // 9.345 vs forced 9.3445 — within tolerance
+    expect(line.findings.filter((x) => x.kind === "CREDIT_EXPECTED")).toHaveLength(0);
+  });
+});
+
 describe("closeFromRateCard — customer breakdown, rated lines, determinism", () => {
   it("keeps per-customer shares and emits per-customer rated lines", () => {
     const model = closeFromRateCard({

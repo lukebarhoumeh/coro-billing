@@ -280,6 +280,7 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       let actualHAmount: Money | null = null;
       let actualHUnit: Money | null = null;
       let invoiceQuantity: number | null = null;
+      let creditExpected: Money | null = null;
       if (invoiceAgg !== undefined && billable) {
         actualHAmount = invoiceAgg.amount;
         invoiceQuantity = invoiceAgg.quantity;
@@ -291,7 +292,25 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
                 `drafting L on ${g.quantity}, actual cost from the invoice; review`)
           );
         }
-        if (actualHUnit !== null) {
+        // Coro 2026-09-22 answer (c): partner-specific discounts DO apply to
+        // legacy flex — Coro's flat-legacy-rate invoicing over-billed those
+        // lines and credits are due. Quantified here; margin stays cash-true
+        // (actual basis) until the credit memo lands.
+        if (
+          actualHUnit !== null &&
+          expectedHAdditive !== null &&
+          classifyInvoiceSku(g.vendorSku) === "legacy" &&
+          actualHUnit.toCents() - expectedHAdditive.toCents() > UNIT_TOLERANCE_CENTS
+        ) {
+          creditExpected = actualHAmount.sub(expectedHAdditive.mul(invoiceQuantity));
+          flist.push(
+            exception("CREDIT_EXPECTED", "warn", card.name, g.vendorSku, period,
+              `Coro billed ${actualHUnit.toFixed2()}/unit but the partner-specific additive ` +
+                `cost is ${expectedHAdditive.toFixed2()} — per Coro's 2026-09-22 answer (c) this ` +
+                `legacy line was over-billed; credit expected ${creditExpected.toFixed2()}`)
+          );
+        }
+        if (actualHUnit !== null && creditExpected === null) {
           const offBy = (expected: Money | null): boolean =>
             expected !== null &&
             Math.abs(actualHUnit!.toCents() - expected.toCents()) > UNIT_TOLERANCE_CENTS;
@@ -360,6 +379,7 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
         teamClientPrice,
         margin,
         marginBasis,
+        creditExpected,
         findings: flist,
       });
       lineFindings.push(...flist);
@@ -427,6 +447,9 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       ),
       totalHActual: actuals.length > 0 ? sum(actuals.map((l) => l.actualHAmount!)) : null,
       totalMargin: sum(lines.filter((l) => l.margin !== null).map((l) => l.margin!)),
+      totalCreditExpected: sum(
+        lines.filter((l) => l.creditExpected !== null).map((l) => l.creditExpected!)
+      ),
       heldLines: lines.filter(
         (l) => l.matchKind === "none" || (l.matchKind !== "nfr" && l.unitL === null)
       ).length,
@@ -466,5 +489,6 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
     usageOnly,
     findings: [...findings, ...lineFindings, ...invoiceFindings, ...globalFindings],
     ratedLines,
+    totalCreditExpected: sum(partners.map((p) => p.totalCreditExpected)),
   };
 }

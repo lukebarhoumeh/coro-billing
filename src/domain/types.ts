@@ -435,6 +435,14 @@ export interface DraftLine {
   /** amountL − (actualHAmount ?? expectedHAdditive×qty); null when no basis. */
   readonly margin: Money | null;
   readonly marginBasis: "actual" | "expected-additive" | "none";
+  /**
+   * Coro billed above the confirmed additive cost on this LEGACY line — credit
+   * due per Coro's 2026-09-22 answer (c): actualHAmount − expectedHAdditive ×
+   * invoiceQuantity. Null on current-gen, under-billed, in-tolerance, and
+   * no-invoice lines. Margin stays cash-true (actual basis) until the credit
+   * memo lands; this field is the expected correction.
+   */
+  readonly creditExpected: Money | null;
   readonly findings: readonly Exception[];
 }
 
@@ -458,6 +466,8 @@ export interface PartnerDraft {
   /** Sum of actualHAmount; null until at least one invoice line matched. */
   readonly totalHActual: Money | null;
   readonly totalMargin: Money;
+  /** Sum of creditExpected over lines that carry one (zero when none). */
+  readonly totalCreditExpected: Money;
   readonly heldLines: number;
 }
 
@@ -474,4 +484,6 @@ export interface CloseModel {
   readonly findings: readonly Exception[];
   /** For buildInvoices → QuickBooks export reuse (billable lines only). */
   readonly ratedLines: readonly RatedLine[];
+  /** Month total of expected Coro credits (2026-09-22 answer c); zero when none. */
+  readonly totalCreditExpected: Money;
 }
