@@ -7,16 +7,18 @@
  *   - NO acceptance/signature blocks (invoice, not a quote);
  *   - the real MSPHUB wordmark (web/public/brand/msphub-logo.jpeg).
  *
+ * CUSTOMER-FACING: no cost, GP, or GM appears anywhere in this document —
+ * margin analysis lives on the Margins/Overview screens (Luke, 2026-09-21).
  * This is a PAPER document: fixed light palette (navy #1B3A57, gold #B98A2F,
  * slate ink) independent of the app's dark theme, so screen and print are the
- * same artifact. Screen-only review columns (cost, GP) and annotations carry
- * print:hidden. Printing preserves the brand colors via print-color-adjust
- * (see index.css).
+ * same artifact. Screen-only review annotations (held reasons, team-price and
+ * qty notes — billing correctness, not margin) carry print:hidden. Printing
+ * preserves the brand colors via print-color-adjust (see index.css).
  */
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { DraftLine, Exception, ExceptionKind, PartnerDraft, Period } from "@pipeline/domain/types.js";
-import { gmPct, money } from "@/lib/format";
+import { money } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 const NAVY = "#1B3A57";
@@ -87,7 +89,6 @@ function LineRow({ line, service }: { line: DraftLine; service: string }) {
   const held = !nfr && line.unitL === null;
   const zeroUsage = !nfr && !held && line.quantity === 0;
   const badges = anomalyLabels(line.findings);
-  const marginNegative = line.margin !== null && line.margin.isNegative();
   const heldReason =
     line.findings.find((f) => f.kind === "MISSING_RATE" || f.kind === "UNKNOWN_PRODUCT_CODE")
       ?.message ?? "no rate on the card";
@@ -179,48 +180,13 @@ function LineRow({ line, service }: { line: DraftLine; service: string }) {
             <span className="text-slate-400">—</span>
           )}
         </td>
-        <td className="tabular px-3 py-3 text-right align-top text-sm text-slate-600 print:hidden">
-          {(() => {
-            const primary = line.actualHUnit ?? line.expectedHAdditive;
-            if (primary === null) return <span className="text-slate-400">—</span>;
-            const caption =
-              line.actualHUnit !== null ? "actual (Coro invoice)" : "expected (additive)";
-            const sheetNote =
-              line.expectedHSheet !== null &&
-              line.expectedHAdditive !== null &&
-              !line.expectedHSheet.equalsCents(line.expectedHAdditive)
-                ? money(line.expectedHSheet)
-                : null;
-            return (
-              <div>
-                <div>{money(primary)}</div>
-                <div className="text-[11px] text-slate-400">{caption}</div>
-                {sheetNote !== null && (
-                  <div className="text-[11px] text-slate-400">sheet {sheetNote}</div>
-                )}
-              </div>
-            );
-          })()}
-        </td>
-        <td className="tabular px-3 py-3 text-right align-top text-sm print:hidden">
-          {line.margin !== null ? (
-            <div>
-              <div className={marginNegative ? "text-red-600" : "text-emerald-700"}>
-                {money(line.margin)}
-              </div>
-              <div className="text-[11px] text-slate-400">GM {gmPct(line.margin, line.amountL)}</div>
-            </div>
-          ) : (
-            <span className="text-slate-400">—</span>
-          )}
-        </td>
       </tr>
       {line.customers.length > 0 && (
         // Collapsed on screen until toggled; ALWAYS rendered in print — the MSP
         // wants the by-customer detail on the paper invoice.
         <tr className={cn("border-b border-slate-200 bg-slate-50", !expanded && "hidden print:table-row")}>
           <td />
-          <td colSpan={5} className="px-3 py-2">
+          <td colSpan={3} className="px-3 py-2">
             <PaperLabel>By customer</PaperLabel>
             <div className="mt-1 max-w-md text-[11px] text-slate-600">
               {line.customers.map((c) => (
@@ -258,7 +224,6 @@ export function InvoiceDoc({
   const { contactName, contactEmail, address } = draft.contact;
   const service = monthRange(period);
   const today = new Date().toLocaleDateString("en-US");
-  const negative = draft.totalMargin.isNegative();
 
   return (
     <div className="print-invoice overflow-hidden rounded-xl bg-white shadow-ledger-lift">
@@ -332,8 +297,6 @@ export function InvoiceDoc({
                 <th className="px-3 py-2.5 text-left">Description</th>
                 <th className="px-3 py-2.5 text-right">Unit price</th>
                 <th className="px-3 py-2.5 text-right">Extended</th>
-                <th className="px-3 py-2.5 text-right print:hidden">Cost / unit</th>
-                <th className="px-3 py-2.5 text-right print:hidden">GP</th>
               </tr>
             </thead>
             <tbody>
@@ -394,31 +357,6 @@ export function InvoiceDoc({
                   Total due
                 </span>
                 <span className="figure tabular text-2xl font-semibold">{money(draft.totalL)}</span>
-              </div>
-              {/* Screen-only margin readout — never printed, never sent. */}
-              <div className="mt-3 space-y-1 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 print:hidden">
-                <div className="flex justify-between">
-                  <span>Expected cost (additive rule)</span>
-                  <span className="tabular">{money(draft.totalHExpected)}</span>
-                </div>
-                {draft.totalHActual !== null && (
-                  <div className="flex justify-between">
-                    <span>Actual cost (Coro invoice)</span>
-                    <span className="tabular">{money(draft.totalHActual)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-medium">
-                  <span>Gross profit (GP)</span>
-                  <span className={cn("tabular", negative ? "text-red-600" : "text-emerald-700")}>
-                    {money(draft.totalMargin)}
-                  </span>
-                </div>
-                <div className="flex justify-between font-medium">
-                  <span>Gross margin (GM)</span>
-                  <span className={cn("tabular", negative ? "text-red-600" : "text-emerald-700")}>
-                    {gmPct(draft.totalMargin, draft.totalL)}
-                  </span>
-                </div>
               </div>
             </div>
           </div>
