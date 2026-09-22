@@ -2,18 +2,29 @@
  * Rate-card close over the REAL August 2026 packet (skipped when data/ absent —
  * the real files are git-ignored; see .gitignore).
  *
- * Every number here was DERIVED from the packet on 2026-09-21 and then pinned:
- * a parser or close regression fails against ground truth, not toys. Notable
- * business facts these assertions encode:
- *   - all 16 usage workspaces join the special-pricing CSV (usageOnly empty);
- *   - drafted revenue $13,376.40 vs actual Coro cost $12,286.13 → margin $884.02;
- *   - Rocker ties invoice 2193 line 1 to the cent (46 × $6.40 = $294.40 billed,
- *     $255.30 cost, $39.10 margin);
- *   - four partners draft margin-NEGATIVE under the current card (TechLead,
- *     Evolve, XTB, Teledata) — real findings, not bugs;
- *   - exactly two lines are HELD: Net-Tech BUEMAILflex and Cyber Construction
- *     BUCOCLASSMNflex have no rate row on their cards;
- *   - the two July Rocker lines on invoice 2193 are excluded as out-of-period.
+ * Every number here was DERIVED from the packet and then pinned: a parser or
+ * close regression fails against ground truth, not toys. Re-pinned 2026-09-22
+ * after Coro answered the clarification letter and sent the corrected sheet
+ * (docs/superpowers/specs/2026-09-22-coro-answers-adoption.md). What the
+ * assertions encode now:
+ *   - all 16 usage workspaces join the corrected special-pricing CSV;
+ *   - ZERO held lines: Net-Tech "BUEmail Flex" and Cyber Construction
+ *     "Managed Coro Classic" rows exist (+$402.00 drafted), and CC's
+ *     BUCOCLASSflex prices through the signature-guarded mislabel override
+ *     (Coro renamed the $11.99 Classic row "Modules Flex");
+ *   - drafted revenue $13,778.40 vs actual Coro cost $12,998.33 → margin
+ *     $780.07. Actual H rose because the two formerly-held lines now attach
+ *     their invoice actuals — Coro HAS been billing Net-Tech email protection
+ *     ($412.50/mo at the flat legacy rate) while the line was unbillable;
+ *   - CREDIT_EXPECTED $1,041.38 over 10 legacy lines (answer c: partner
+ *     discounts apply to legacy; Coro's flat-rate invoicing over-billed) —
+ *     Evolve $95.00, Net-Tech $150.00, TechLead $695.00, Teledata $25.00,
+ *     XTB $76.38. Margin stays cash-true until the credit memos land;
+ *   - TechLead's Managed Classic line is NOT credited (Classic family = flat
+ *     45% regardless, answer c) but its 50/5 card row is flagged;
+ *   - the four margin-negative partners persist on actual basis — post-credit
+ *     they flip positive except TechLead's Classic sell price ($8.50 < $9.34);
+ *   - the two July Rocker lines on invoice 2193 stay out-of-period.
  */
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
@@ -62,17 +73,45 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
     expect(model.cardOnly.map((p) => p.name)).toContain("Seven Star Systems");
   });
 
-  it("foots the month: L $13,376.40, actual H $12,286.13, margin $884.02", () => {
+  it("foots the month: L $13,778.40, actual H $12,998.33, margin $780.07", () => {
     const totalL = model.partners.reduce((s, p) => s + p.totalL.toNumber(), 0);
     const totalHActual = model.partners.reduce((s, p) => s + (p.totalHActual?.toNumber() ?? 0), 0);
     const totalHExpected = model.partners.reduce((s, p) => s + p.totalHExpected.toNumber(), 0);
     const totalMargin = model.partners.reduce((s, p) => s + p.totalMargin.toNumber(), 0);
-    expect(totalL.toFixed(2)).toBe("13376.40");
-    // 12,492.38 = 12,286.13 + AVOX's 2193 line ($206.25), which attaches since
-    // the vaimancom → "AVOX LLC" map fix (2026-09-21).
-    expect(totalHActual.toFixed(2)).toBe("12492.38");
-    expect(totalHExpected.toFixed(2)).toBe("11697.87");
-    expect(totalMargin.toFixed(2)).toBe("884.02");
+    // 13,778.40 = the 2026-09-21 close's 13,376.40 + Net-Tech BUEmail 100×$3.00
+    // + Cyber Construction Managed Coro Classic 10×$10.20 (both formerly HELD).
+    expect(totalL.toFixed(2)).toBe("13778.40");
+    // 12,998.33 = prior 12,492.38 + NT email actual 412.50 + CC classmn 93.45
+    // (held lines never attached their invoice actuals; billable lines do).
+    expect(totalHActual.toFixed(2)).toBe("12998.33");
+    expect(totalHExpected.toFixed(2)).toBe("12070.82");
+    // 780.07 = prior 884.02 − 112.50 (NT email: bill $300 vs Coro's $412.50
+    // until the credit lands) + 8.55 (CC classmn $102.00 − $93.45).
+    expect(totalMargin.toFixed(2)).toBe("780.07");
+  });
+
+  it("quantifies the expected Coro credits — $1,041.38 over 5 partners (answer c)", () => {
+    expect(model.totalCreditExpected.toFixed2()).toBe("1041.38");
+    const byPartner = Object.fromEntries(
+      model.partners
+        .filter((p) => p.totalCreditExpected.toCents() !== 0)
+        .map((p) => [p.cardName, p.totalCreditExpected.toFixed2()])
+    );
+    expect(byPartner).toEqual({
+      "Evolve Technologies": "95.00",
+      "Net-Tech": "150.00",
+      "TechLead Professional Services LLC": "695.00",
+      "Teledata Cloud Services": "25.00",
+      "XTB Solutions": "76.38",
+    });
+  });
+
+  it("Classic family is flat-45 regardless (answer c): TechLead's line costs 9.34, no credit", () => {
+    const techlead = model.partners.find((p) => p.cardName.startsWith("TechLead"))!;
+    const classic = techlead.lines.find((l) => l.vendorSku.toLowerCase() === "bucoclassmnflex")!;
+    expect(classic.expectedHAdditive!.toFixed2()).toBe("9.34"); // 16.99×0.55, card's 50/5 overridden
+    expect(classic.creditExpected).toBeNull();
+    expect(classic.findings.some((f) => f.kind === "CLASSIC_RATE_RULE_DISAGREES")).toBe(true);
   });
 
   it("ties Rocker to invoice 2193 line 1 to the cent", () => {
@@ -82,11 +121,13 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
     expect(rocker.totalMargin.toFixed2()).toBe("39.10");
   });
 
-  it("prices Amplivity MODNETWflex from its product-specific 'Network Flex' row", () => {
+  it("prices Amplivity MODNETWflex from the generic row (Coro renamed 'Network Flex')", () => {
+    // Same $3.00 either way — the 2026-09-22 sheet renamed Amplivity's
+    // "Network Flex" row to "Modules Flex", so the specific-flex chain dangles.
     const amplivity = model.partners.find((p) => p.cardName === "Amplivity")!;
     const mod = amplivity.lines.find((l) => l.vendorSku.toLowerCase() === "modnetwflex")!;
-    expect(mod.matchKind).toBe("specific-flex");
-    expect(mod.productLabel).toBe("Network Flex");
+    expect(mod.matchKind).toBe("modules-flex");
+    expect(mod.productLabel).toBe("Modules Flex");
     expect(mod.unitL!.toFixed2()).toBe("3.00");
   });
 
@@ -97,38 +138,59 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
     expect(sat.unitL!.toFixed2()).toBe("1.40");
   });
 
-  it("HOLDS exactly the two lines whose cards have no rate row", () => {
+  it("holds NOTHING — the two formerly-held lines now bill from the corrected sheet", () => {
     const held = model.partners.flatMap((p) =>
       p.lines
         .filter((l) => l.matchKind === "none" || (l.matchKind !== "nfr" && l.unitL === null))
         .map((l) => `${p.cardName}|${l.vendorSku}`)
     );
-    expect(held.sort()).toEqual([
-      "Cyber Construction|BUCOCLASSMNflex",
-      "Net-Tech|BUEMAILflex",
-    ]);
+    expect(held).toEqual([]);
+
+    const netTech = model.partners.find((p) => p.cardName === "Net-Tech")!;
+    const email = netTech.lines.find((l) => l.vendorSku.toLowerCase() === "buemailflex")!;
+    expect(email.matchKind).toBe("exact"); // new "BUEmail Flex" row
+    expect(email.unitL!.toFixed2()).toBe("3.00");
+    expect(email.amountL!.toFixed2()).toBe("300.00");
+    // Coro was billing this all along at the flat legacy 7.50×0.55 = 4.125:
+    expect(email.actualHAmount!.toFixed2()).toBe("412.50");
+    expect(email.creditExpected!.toFixed2()).toBe("150.00"); // 412.50 − 2.625×100
+
+    const cc = model.partners.find((p) => p.cardName === "Cyber Construction")!;
+    const classmn = cc.lines.find((l) => l.vendorSku.toLowerCase() === "bucoclassmnflex")!;
+    expect(classmn.matchKind).toBe("exact"); // new "Managed Coro Classic" row
+    expect(classmn.unitL!.toFixed2()).toBe("10.20");
+    // CC's old "Coro Classic Flex" row is now NAMED "Modules Flex" ($11.99 list)
+    // — priced through the signature-guarded mislabel override, same values:
+    const classf = cc.lines.find((l) => l.vendorSku.toLowerCase() === "bucoclassflex")!;
+    expect(classf.matchKind).toBe("mislabel-override");
+    expect(classf.unitL!.toFixed2()).toBe("7.20");
+    // and CC's MOD/ADD lines price from the true modules row, not the mislabel:
+    const modline = cc.lines.find((l) => l.vendorSku.toLowerCase() === "modcloudflex")!;
+    expect(modline.productLabel).toBe("Coro Module Flex");
+    expect(modline.unitL!.toFixed2()).toBe("3.00");
   });
 
   it("surfaces the real finding histogram — nothing silently resolved", () => {
     const hist: Record<string, number> = {};
     for (const f of model.findings) hist[f.kind] = (hist[f.kind] ?? 0) + 1;
     expect(hist).toEqual({
-      SHEET_MATH_INCONSISTENT: 46,
-      EMPTY_PARTNER_BLOCK: 1,
-      AUDIT_QTY_MISMATCH: 8,
-      INVOICE_RATE_UNEXPECTED: 24,
-      ASSUMED_MAPPING: 2,
-      UNKNOWN_PRODUCT_CODE: 2,
+      SHEET_MATH_INCONSISTENT: 46, // same count, different rows — Coro fixed the
+      // Seven Star/DK col-I errors but the new rows' additive-H cells ≠ E×0.95
+      LIST_PRICE_DIVERGES: 1, // CC's mislabeled $11.99 "Modules Flex" vs $7.50 elsewhere
+      AUDIT_QTY_MISMATCH: 8, // the 8 self-contradictory audit strings (call item)
+      INVOICE_RATE_UNEXPECTED: 14, // was 24 — the 10 legacy over-bills are CREDIT_EXPECTED
+      // now; the rest are the $2.20 MOD under-bills (legacy list question, call item)
+      CREDIT_EXPECTED: 10, // $1,041.38 — answer (c) over-bills awaiting Coro credit memos
+      CLASSIC_RATE_RULE_DISAGREES: 1, // TechLead's 50/5 Managed Classic row
+      SHEET_MISLABEL_OVERRIDE: 1, // CC BUCOCLASSflex via the renamed Classic row
       PRODUCT_FALLBACK: 3,
       NFR_LINE: 1,
       OUT_OF_PERIOD_LINE: 2, // the two July Rocker lines on invoice 2193
-      // NO_USAGE_BREAKDOWN gone: the "AVOX LLC" invoice line was always backed
-      // by vaimancom usage — the curated map just called it "Vaiman" (fixed).
-      // Every legacy flex line the team keyed in "Coro August Billing.xlsx"
-      // carries a pre-rate-card Client Price that differs from CSV col E
-      // (their own TechLead note: "Still $11/seat; legacy rate unresolved").
-      // Current-gen lines all match. Audit 2026-09-21: $2,234.66/mo delta.
-      CLIENT_PRICE_DIFFERS: 33,
+      // EMPTY_PARTNER_BLOCK gone (stray "XTB" row removed), UNKNOWN_PRODUCT_CODE
+      // gone (zero held), ASSUMED_MAPPING retired (ADD* = modules, confirmed).
+      // CLIENT_PRICE_DIFFERS 33→35: the two unheld lines join (team keyed
+      // NT email at the 4.12 cost pass-through vs card 3.00; CC classmn 9.35 vs 10.20).
+      CLIENT_PRICE_DIFFERS: 35,
     });
   });
 
@@ -145,8 +207,9 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
     ]);
   });
 
-  it("emits 149 rated lines for QuickBooks and is deterministic", () => {
-    expect(model.ratedLines).toHaveLength(149);
+  it("emits 153 rated lines for QuickBooks and is deterministic", () => {
+    // 149 + the customer shares of the two formerly-held lines
+    expect(model.ratedLines).toHaveLength(153);
     expect(buildModel()).toEqual(model);
   });
 });

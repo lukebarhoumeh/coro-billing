@@ -15,7 +15,7 @@ No `git push`, no `vercel` deploy until she signs off. Everything lands as local
 | --- | --- | --- |
 | 1a | Net-Tech Email Protection rate "has been added" | New sheet row **"BUEmail Flex"** (list $7.50, F 60%, E $3.00, G 5%, H $2.63, I 65%). Name not in `buemailflex` chain → add alias. Unholds 100 units → +$300.00 L. |
 | 1b | Cyber Construction Managed Coro Classic "has been added" | New sheet row **"Managed Coro Classic"** (list $16.99, F 40%, E $10.20, G 5%, H $9.35, I 45%). Name not in `bucoclassmnflex` chain → add alias. Unholds 10 units → +$102.00 L. |
-| 2 | **(c)** Partner discounts DO apply to legacy flex, **except Coro Classic & Managed Classic: 40% partner / 45% MSP Hub regardless**. Coro "had been crediting/working to credit MSP Hub". | The additive rule (`expectedHAdditive`) is confirmed canonical. Add a **Classic-family forced-cost rule** (list × 0.55 for `BUCOCLASSflex`/`BUCOCLASSMNflex` regardless of card F/G). Legacy lines where Coro's actual > additive become **CREDIT_EXPECTED** findings with quantified amounts (**$891.29 over 9 August lines** — see §4). |
+| 2 | **(c)** Partner discounts DO apply to legacy flex, **except Coro Classic & Managed Classic: 40% partner / 45% MSP Hub regardless**. Coro "had been crediting/working to credit MSP Hub". | The additive rule (`expectedHAdditive`) is confirmed canonical. Add a **Classic-family forced-cost rule** (list × 0.55 for `BUCOCLASSflex`/`BUCOCLASSMNflex` regardless of card F/G). Legacy lines where Coro's actual > additive become **CREDIT_EXPECTED** findings with quantified amounts (**$1,041.38 over 10 August lines** — see §4; measured, supersedes the pre-implementation $891.29 estimate which missed that Coro was already billing NT email protection). |
 | 3-H | Col H "meant to represent MSP Hub's expected cost of license… possible $0.01 rounding. Can you share the inconsistencies?" | H is **bimodal** in the new sheet: 276/297 rows = E×0.95, 17 = additive (all rows Coro re-derived this revision), 3 = neither, 1 blank. Under Coro's own stated model, **279 rows carry a wrong H** (deltas +$0.10…+$3.15 — not rounding). Deliverable: machine-readable discrepancy list (§6). Engine keeps carrying H as written; additive stays the canonical cost. |
 | 3-I | I should = F+G, G = 45−F floored at 5% when F>40 | Exactly our additive rule. Seven Star + DK Systems I-errors **fixed in the new sheet**. Remaining violations (Rex Black ×3 impossible rows; Auditlytics/Copperband G=9) go in the reply doc. |
 | 3-MDR | ADD\* (MDR, Secured Web Gateway) "Confirmed. These are modules." | `assumed-add` match kind → confirmed **`add-module`**; ASSUMED_MAPPING finding retired. |
@@ -98,16 +98,16 @@ Probed by running the engine as-is against the new CSV (read-only, `coro_probe.m
 
 ### D5 — Tests (numbers predicted by probe, verified line-by-line at re-pin time)
 - New unit tests: productMap aliases/reorder/override-guard; Classic forced cost; CREDIT_EXPECTED emission.
-- Re-pin `tests/e2e.rateCardClose.real.test.ts`: L **$13,778.40** (= old 13,376.40 + 300.00 + 102.00),
-  actual H back to **$12,492.38**, held **[]**, UNKNOWN_PRODUCT_CODE 0, ASSUMED_MAPPING 0,
-  EMPTY_PARTNER_BLOCK 0, +LIST_PRICE_DIVERGES 1 (CC $11.99 "Modules Flex" vs $7.50 elsewhere),
-  +SHEET_MISLABEL_OVERRIDE 1, +CREDIT_EXPECTED 9, +CLASSIC_RATE_RULE_DISAGREES (TechLead ≥1),
-  INVOICE_RATE_UNEXPECTED 24 → ~14 (the credit lines split out), CLIENT_PRICE_DIFFERS 33 → ~35
-  (+Net-Tech email $3.00 vs team $4.12; +CC classmn $10.20 vs $9.35), negative partners unchanged,
-  `totalCreditExpected` **$891.29**, totalHExpected recomputed (TechLead classmn forced 45 moves it),
-  ratedLines 149 + new customer shares (measure). `e2e.techleadJuly.real.test.ts`: L-side pins
-  ($3,555.00, unit rates) should hold — TechLead's rows are byte-identical; only cost-side
-  expectations shift (verify; July has no Coro invoice loaded so CREDIT_EXPECTED can't fire there).
+- Re-pin `tests/e2e.rateCardClose.real.test.ts` — MEASURED (probe + engine, all identities
+  reconciled): L **$13,778.40** (= old 13,376.40 + 300.00 + 102.00), actual H **$12,998.33**
+  (= 12,492.38 + NT email 412.50 + CC classmn 93.45 — formerly-held lines now attach actuals),
+  totalHExpected **$12,070.82**, margin **$780.07**, held **[]**, histogram: SHEET_MATH 46,
+  LIST_PRICE_DIVERGES 1, AUDIT_QTY 8, INVOICE_RATE_UNEXPECTED 14, CREDIT_EXPECTED 10,
+  CLASSIC_RATE_RULE_DISAGREES 1, SHEET_MISLABEL_OVERRIDE 1, PRODUCT_FALLBACK 3, NFR 1,
+  OUT_OF_PERIOD 2, CLIENT_PRICE_DIFFERS 35 (EMPTY_PARTNER_BLOCK / UNKNOWN_PRODUCT_CODE /
+  ASSUMED_MAPPING gone), negative partners unchanged, `totalCreditExpected` **$1,041.38**,
+  ratedLines **153**. `e2e.techleadJuly.real.test.ts`: passes untouched (verified after every
+  engine task — TechLead rows byte-identical; July loads no Coro invoice so no credits fire).
 - Old-sheet parse fixtures unaffected (fixtures are synthetic).
 
 ### Non-goals this round
@@ -116,13 +116,25 @@ Probed by running the engine as-is against the new CSV (read-only, `coro_probe.m
 - No demo-fixture credit examples; demo mode unchanged.
 - No deploy, no push, no packet baking, no QBO work (still blocked on Intuit app).
 
-## 4. Expected credit detail (August, invoice 2193, per answer (c))
+## 4. Expected credit detail (August, invoice 2193, per answer (c)) — MEASURED
 
-Gross legacy over-bill $908.19 over 10 lines minus TechLead `BUCOCLASSMNflex` $16.90 (Classic
-exception — Coro's $9.34 is the agreed cost): **$891.29 / 9 lines**:
-Evolve BUCOMflex $27.00, Evolve BUCOMMNGflex $68.00, TechLead BUCOMMNGflex $680.00,
-TechLead BUCOROflex $15.00, Teledata BUCOROflex $2.96, Teledata BUENDflex $21.92,
-XTB BUCOMflex $37.50, XTB BUCOROflex $29.25, XTB BUENDflex $9.66.
+**$1,041.38 over 10 lines / 5 partners** (engine `totalCreditExpected`, full-precision Money;
+TechLead `BUCOCLASSMNflex` correctly excluded — Classic exception makes Coro's $9.34 the agreed cost):
+
+| Partner | Credit | Lines |
+| --- | --- | --- |
+| TechLead | $695.00 | BUCOMMNGflex $680.00 (340 × $2.00), BUCOROflex $15.00 |
+| Net-Tech | $150.00 | BUEMAILflex (Coro billed $4.125 flat vs additive $2.625 × 100) |
+| Evolve | $95.00 | BUCOMflex $27.00, BUCOMMNGflex $68.00 |
+| XTB Solutions | $76.38 | BUCOMflex $37.50, BUCOROflex $29.25, BUENDflex $9.66 |
+| Teledata | $25.00 | BUCOROflex $2.96, BUENDflex $21.92 |
+
+**Discovery during implementation:** Coro HAS been billing Net-Tech's email protection all along
+($412.50 on 2193 at the flat legacy rate) — the old HELD line just never attached its invoice
+actuals. So August actual H is **$12,998.33** (not the pre-implementation 12,492.38 guess),
+margin **$780.07**, and the NT email line is cash-negative (bill $300.00 vs cost $412.50) until
+the credit lands — post-credit it's +$37.50/mo. Danny item: at Coro's flat-rate billing this SKU
+is underwater at the new card's $3.00 sell.
 
 ## 5. Why margins stay actual-basis
 
