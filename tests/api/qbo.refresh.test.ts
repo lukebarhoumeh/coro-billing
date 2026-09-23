@@ -18,7 +18,7 @@ describe("POST /api/qbo/refresh", () => {
   });
 
   it("rotates the pair and returns both expiries", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string, _init: { body: string; headers: Record<string, string> }) =>
       jsonResponse(200, {
         access_token: "newA",
         refresh_token: "newR",
@@ -37,7 +37,7 @@ describe("POST /api/qbo/refresh", () => {
       expiresAt: NOW + 3600 * 1000,
       refreshTokenExpiresAt: NOW + 8_640_000 * 1000,
     });
-    const [url, init] = fetchMock.mock.calls[0]! as [string, { body: string; headers: Record<string, string> }];
+    const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer");
     expect(init.body).toContain("grant_type=refresh_token");
     expect(init.body).toContain("refresh_token=oldR");
