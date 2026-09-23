@@ -1294,6 +1294,8 @@ git add web/src/lib/qbo.ts tests/web/qboClient.test.ts
 git commit -m "feat(web): QBO client helper — auto-refresh with rotation, pushed-state store"
 ```
 
+**Post-review hardening (landed as a follow-up commit after quality review):** `refreshTokens` now throws `ReconnectRequired` ONLY on refresh-endpoint 401/400 (dead token); transient failures (Intuit 5xx, missing env, malformed body) throw a plain `Error` so the card renders a failure row but KEEPS the valid stored connection. The 401-path rotation persist is pinned by a storage assertion (mutation-verified). `loadPushed` rejects non-object JSON. `pushInvoice` doc comment documents the no-concurrent-calls + thread-the-returned-conn constraints. Suite 316 after this.
+
 ---
 
 ### Task 5: Rewire `QuickBooksCard.tsx`
@@ -1632,6 +1634,8 @@ Expected: ALL tests pass (314 after Task 4 — Task 5 adds no tests).
 git add web/src/components/QuickBooksCard.tsx
 git commit -m "feat(web): QuickBooksCard v2 — auto-renewing connection, dedup-aware push results"
 ```
+
+**Post-review hardening (landed as a follow-up commit after quality review):** a `pushGeneration` ref guards the push loop — bumped on every `pushedKey` change and on each `pushApproved` entry; the loop re-checks after every `await` (and in the catch) and exits silently when stale. Kills the re-drop-mid-push race (stale loop clobbering the new key's pushed-state / resurrecting old results) and makes overlapping push runs structurally impossible. Result rows are keyed by partner `slug` (domain identity), not display name.
 
 ---
 
