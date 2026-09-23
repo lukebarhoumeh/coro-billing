@@ -24,8 +24,10 @@ describe("GET /api/qbo/connect", () => {
     const cookie = cap.headers["set-cookie"];
     expect(cookie).toContain(`qbo_oauth_state=${m![1]}`);
     expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Secure");
     expect(cookie).toContain("SameSite=Lax");
     expect(cookie).toContain("Path=/api/qbo");
+    expect(cookie).toContain("Max-Age=600");
   });
 });
 
@@ -43,6 +45,8 @@ describe("GET /api/qbo/callback", () => {
   });
 
   it("400s when the state cookie is absent or mismatched", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     const a = capture();
     await callback({ query: { code: "c", realmId: "r", state: "s1" }, headers: {} }, a.res);
     expect(a.cap.status).toBe(400);
@@ -52,6 +56,28 @@ describe("GET /api/qbo/callback", () => {
       b.res
     );
     expect(b.cap.status).toBe(400);
+    const c = capture();
+    await callback(
+      { query: { code: "c", realmId: "r" }, headers: { cookie: "qbo_oauth_state=s1" } },
+      c.res
+    );
+    expect(c.cap.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a hostile realmId before any token exchange", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { res, cap } = capture();
+    await callback(
+      {
+        query: { code: "c", realmId: "</script><script>alert(1)//", state: "s1" },
+        headers: { cookie: "qbo_oauth_state=s1" },
+      },
+      res
+    );
+    expect(cap.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("posts tokens (with refreshTokenExpiresAt) only to our origin", async () => {
@@ -69,7 +95,7 @@ describe("GET /api/qbo/callback", () => {
     const { res, cap } = capture();
     await callback(
       {
-        query: { code: "c", realmId: "realm9", state: "s1" },
+        query: { code: "c", realmId: "9130357849", state: "s1" },
         headers: { cookie: "other=1; qbo_oauth_state=s1" },
       },
       res

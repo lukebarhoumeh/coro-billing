@@ -31,7 +31,7 @@ export default function handler(req: Req, res: Res): void {
   }
   // CSRF token: stored in an HttpOnly cookie here, checked against the state
   // query param by the callback. 10 minutes is plenty to finish the popup.
-  const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const state = crypto.randomUUID();
   res.setHeader(
     "Set-Cookie",
     `qbo_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/qbo; Max-Age=600`

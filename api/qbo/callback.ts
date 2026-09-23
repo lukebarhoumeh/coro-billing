@@ -47,8 +47,19 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     res.status(503).json({ error: "QuickBooks is not configured (missing env)." });
     return;
   }
+  let origin: string;
+  try {
+    origin = new URL(redirectUri).origin;
+  } catch {
+    res.status(503).json({ error: "QBO_REDIRECT_URI is not a valid URL." });
+    return;
+  }
   if (!code || !realmId) {
     res.status(400).json({ error: "Missing code/realmId from Intuit." });
+    return;
+  }
+  if (!/^\d+$/.test(realmId)) {
+    res.status(400).json({ error: "Invalid realmId." });
     return;
   }
   if (!state || !cookieState || state !== cookieState) {
@@ -86,7 +97,6 @@ export default async function handler(req: Req, res: Res): Promise<void> {
 
   // Hand off to the opener — OUR origin only — and close. The payload never
   // touches our servers again. The one-shot state cookie is cleared.
-  const origin = new URL(redirectUri).origin;
   const payload = JSON.stringify({
     type: "qbo-connected",
     realmId,
@@ -95,6 +105,9 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     expiresAt: Date.now() + tokens.expires_in * 1000,
     refreshTokenExpiresAt: Date.now() + tokens.x_refresh_token_expires_in * 1000,
   });
+  // JSON.stringify leaves "<" alone; escape it so a value can never terminate
+  // the <script> element ("<" is a valid JSON string escape — same data).
+  const safePayload = payload.replace(/</g, "\\u003c");
   res.setHeader(
     "Set-Cookie",
     "qbo_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/api/qbo; Max-Age=0"
@@ -104,7 +117,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
 <div>QuickBooks connected — you can close this window.</div>
 <script>
   if (window.opener) {
-    window.opener.postMessage(${payload}, ${JSON.stringify(origin)});
+    window.opener.postMessage(${safePayload}, ${JSON.stringify(origin)});
     setTimeout(function(){ window.close(); }, 800);
   }
 </script></body></html>`);
