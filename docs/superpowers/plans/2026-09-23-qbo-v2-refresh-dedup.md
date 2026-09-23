@@ -566,6 +566,8 @@ git add tests/api/qbo.oauth.test.ts api/qbo/connect.ts api/qbo/callback.ts
 git commit -m "fix(qbo): verify OAuth state, scope postMessage to our origin, carry refresh-token expiry"
 ```
 
+**Post-review hardening (landed as a follow-up commit after quality review):** (a) state generated with `crypto.randomUUID()` instead of `Math.random()`; (b) `realmId` validated as numeric (`/^\d+$/`) and the postMessage payload interpolated with `<` escaped as `<` — closes a `</script>` breakout on the token-holding origin; (c) `origin` derived from `QBO_REDIRECT_URI` inside the env-check block (fail-fast 503 on malformed URI, before the auth code is consumed); (d) tests additionally stub fetch in the mismatch case and assert it is never called, assert `Secure`/`Max-Age=600` cookie attributes, and cover missing-state-param and hostile-realmId 400s. The Task 5 card listener also gained an `e.origin` check (receiver side of the channel).
+
 ---
 
 ### Task 3: Push dedup in `api/qbo/push.ts`
@@ -1092,7 +1094,7 @@ export function loadConnection(store: KV, now: number): QboConnection | null {
     if (!raw) return null;
     const c = JSON.parse(raw) as QboConnection;
     if (!c.realmId || !c.accessToken || !c.refreshToken) return null;
-    if (c.refreshTokenExpiresAt !== undefined && c.refreshTokenExpiresAt <= now) return null;
+    if (typeof c.refreshTokenExpiresAt === "number" && c.refreshTokenExpiresAt <= now) return null;
     return c;
   } catch {
     return null;
@@ -1372,6 +1374,7 @@ export function QuickBooksCard() {
   // Receive tokens from the OAuth popup.
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return; // only our own popup may hand us tokens
       const d = e.data as { type?: string } & QboConnection;
       if (d?.type === "qbo-connected" && d.realmId && d.accessToken) {
         const c: QboConnection = {
