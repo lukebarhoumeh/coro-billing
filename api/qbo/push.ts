@@ -14,6 +14,9 @@
  *     lines: [{ description, quantity, rate, amount }],
  *   }
  * }
+ * Dedup: if the customer already has an invoice whose DocNumber starts with
+ * the same HUB-<period>- prefix, nothing is written; the response reports the
+ * existing invoice and whether totals match (integer-cents comparison).
  * Env: QBO_DEFAULT_ITEM_ID (optional — the generic service Item; QBO requires
  * an ItemRef on every line; "1" is the stock "Services" item on most files),
  * QBO_ENV ("production" | "sandbox", default sandbox).
@@ -110,7 +113,54 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     return;
   }
 
-  // 2) Create the invoice.
+  // 2) Dedup — never write when this partner+period already has an invoice.
+  // Prefix + customer rather than exact DocNumber: the sequence part is the
+  // partner's index in the model, which can shift when the pricing file
+  // changes; an exact match would miss the earlier push and duplicate.
+  const docNumber = invoice.docNumber ?? "";
+  const prefix = docNumber.slice(0, docNumber.lastIndexOf("-") + 1);
+  if (prefix.length > 0) {
+    const existing = await qbo(
+      realmId,
+      accessToken,
+      `/query?query=${encodeURIComponent(
+        `select Id, DocNumber, TotalAmt from Invoice where CustomerRef = '${customerId}' and DocNumber like '${prefix}%'`
+      )}`
+    );
+    if (!existing.ok) {
+      res.status(existing.status === 401 ? 401 : 502).json({
+        error:
+          existing.status === 401
+            ? "QuickBooks session expired — reconnect."
+            : "QBO invoice query failed",
+        detail: existing.json,
+      });
+      return;
+    }
+    const found =
+      (existing.json as { QueryResponse?: { Invoice?: { Id: string; DocNumber?: string; TotalAmt?: number }[] } })
+        ?.QueryResponse?.Invoice ?? [];
+    if (found.length > 0) {
+      // Skip + flag (decision 2026-09-23): report, compare totals in integer
+      // cents, and let the accountant resolve any difference in QBO itself.
+      const hit = found[0]!;
+      const expectedTotalCents = Math.round(invoice.lines.reduce((s, l) => s + l.amount, 0) * 100);
+      const qboTotalCents = Math.round((hit.TotalAmt ?? 0) * 100);
+      res.status(200).json({
+        ok: true,
+        deduped: true,
+        qboInvoiceId: hit.Id,
+        qboDocNumber: hit.DocNumber,
+        qboTotalCents,
+        expectedTotalCents,
+        totalsMatch: qboTotalCents === expectedTotalCents,
+        duplicateCount: found.length,
+      });
+      return;
+    }
+  }
+
+  // 3) Create the invoice.
   const inv = await qbo(realmId, accessToken, "/invoice", {
     method: "POST",
     body: {
@@ -133,5 +183,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     return;
   }
   const createdInv = (inv.json as { Invoice?: { Id: string; DocNumber?: string } })?.Invoice;
-  res.status(200).json({ ok: true, qboInvoiceId: createdInv?.Id, docNumber: createdInv?.DocNumber });
+  res
+    .status(200)
+    .json({ ok: true, deduped: false, qboInvoiceId: createdInv?.Id, docNumber: createdInv?.DocNumber });
 }
