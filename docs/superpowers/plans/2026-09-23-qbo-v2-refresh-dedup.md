@@ -811,6 +811,8 @@ git add tests/api/qbo.push.test.ts api/qbo/push.ts
 git commit -m "feat(qbo): push dedup — skip + flag existing invoices, never rewrite a ledger"
 ```
 
+**Post-review hardening (landed as a follow-up commit after quality review):** docNumber, when present, must match `/^HUB-\d{6}-\d+$/` (400 otherwise, before any QBO call) — closes QBO LIKE-wildcard widening (`HUB-%-1` would have false-deduped) and quote breakout in the dedup query; absent docNumber remains legal (QBO auto-numbers, dedup skipped). Tests added for the guard, the absent-docNumber bypass, the dedup-query 502 arm, and no-create-after-failure call counts. Task 6 runbook must note: a VOIDED QBO invoice retains its DocNumber (TotalAmt 0) and keeps flagging totals-differ — remediation is delete + re-push, not void.
+
 ---
 
 ### Task 4: Client helper `web/src/lib/qbo.ts`
