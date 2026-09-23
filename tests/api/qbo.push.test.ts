@@ -119,5 +119,46 @@ describe("POST /api/qbo/push — dedup", () => {
     await handler({ method: "POST", body: body() }, res);
     expect(cap.status).toBe(401);
     expect((cap.body as { error: string }).error).toBe("QuickBooks session expired — reconnect.");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("400s a malformed docNumber before any QBO call (wildcards can't widen dedup)", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { res, cap } = capture();
+    const b = body();
+    b.invoice.docNumber = "HUB-%-1";
+    await handler({ method: "POST", body: b }, res);
+    expect(cap.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips dedup when docNumber is absent (QBO auto-numbers) and creates directly", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, CUSTOMER_HIT))
+      .mockResolvedValueOnce(jsonResponse(200, { Invoice: { Id: "700" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { res, cap } = capture();
+    const b = body();
+    delete (b.invoice as { docNumber?: string }).docNumber;
+    await handler({ method: "POST", body: b }, res);
+    expect(cap.status).toBe(200);
+    expect((cap.body as { deduped: boolean; qboInvoiceId: string }).deduped).toBe(false);
+    expect((cap.body as { qboInvoiceId: string }).qboInvoiceId).toBe("700");
+    expect(fetchMock).toHaveBeenCalledTimes(2); // customer query + create — NO dedup query
+  });
+
+  it("502s when the dedup query fails with a non-401", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, CUSTOMER_HIT))
+      .mockResolvedValueOnce(jsonResponse(500, { fault: "boom" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { res, cap } = capture();
+    await handler({ method: "POST", body: body() }, res);
+    expect(cap.status).toBe(502);
+    expect((cap.body as { error: string }).error).toBe("QBO invoice query failed");
+    expect(fetchMock).toHaveBeenCalledTimes(2); // and definitely no create
   });
 });

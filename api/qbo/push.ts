@@ -77,6 +77,13 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     res.status(400).json({ error: "Missing realmId/accessToken/invoice{partner,lines}" });
     return;
   }
+  // App-generated format only (header contract): kills QBO LIKE wildcards (%/_)
+  // and quote breakouts in the dedup query. Absent docNumber stays legal (QBO
+  // auto-numbers; dedup is skipped below).
+  if (invoice.docNumber !== undefined && !/^HUB-\d{6}-\d+$/.test(invoice.docNumber)) {
+    res.status(400).json({ error: "Invalid docNumber — expected HUB-<period>-<seq>." });
+    return;
+  }
   const itemId = process.env["QBO_DEFAULT_ITEM_ID"] ?? "1";
 
   // 1) Find-or-create the Customer by DisplayName.
