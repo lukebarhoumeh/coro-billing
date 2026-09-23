@@ -1284,8 +1284,8 @@ export function recordPushed(store: KV, key: string, slug: string, rec: PushedRe
 
 - [ ] **Step 4.4: Run tests to verify they pass**
 
-Run: `pnpm test -- tests/web/qboClient.test.ts`
-Expected: PASS (9 tests).
+Run: `pnpm test tests/web/qboClient.test.ts`
+Expected: PASS (11 tests).
 
 - [ ] **Step 4.5: Commit**
 
@@ -1624,7 +1624,7 @@ Run: `pnpm --dir web build`
 Expected: `✓ built in …s`.
 
 Run: `pnpm test`
-Expected: ALL tests pass (286 pre-existing + ~22 new ≈ 308).
+Expected: ALL tests pass (314 after Task 4 — Task 5 adds no tests).
 
 - [ ] **Step 5.3: Commit**
 
@@ -1698,7 +1698,7 @@ git commit -m "docs: QuickBooks runbook v2 — auto-refresh + dedup behavior"
 pnpm test && pnpm --dir web typecheck && pnpm --dir web build
 ```
 
-Expected: full suite green (≈308 tests), typecheck silent, build `✓ built`.
+Expected: full suite green (314 tests), typecheck silent, build `✓ built`.
 
 - [ ] **Step 7.2: Spec cross-check**
 
