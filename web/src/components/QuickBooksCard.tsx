@@ -10,7 +10,7 @@
  * When the deployment has no QBO env configured, /api/qbo/connect answers 503
  * and this card explains what's missing instead of pretending.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CircleCheck, CircleX, Link2, Loader2, Send, TriangleAlert } from "lucide-react";
 import { useClose } from "@/lib/closeStore";
 import {
@@ -35,6 +35,7 @@ const usd = (cents: number): string =>
 type PushState = "idle" | "pushing" | "done";
 type Tone = "ok" | "muted" | "warn" | "fail";
 interface PushResult {
+  readonly slug: string;
   readonly partner: string;
   readonly tone: Tone;
   readonly detail: string;
@@ -48,6 +49,9 @@ export function QuickBooksCard() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [pushState, setPushState] = useState<PushState>("idle");
   const [results, setResults] = useState<readonly PushResult[]>([]);
+  // Monotonic generation: any close-identity change (or a newer push) invalidates
+  // an in-flight push loop, which then exits without touching state or storage.
+  const pushGeneration = useRef(0);
 
   // Pushed-state is keyed like review state: period + file fingerprints, so a
   // changed pricing file naturally resets it and the server dedup takes over.
@@ -60,6 +64,7 @@ export function QuickBooksCard() {
   );
   const [pushed, setPushed] = useState<PushedState>({});
   useEffect(() => {
+    pushGeneration.current += 1; // kill any in-flight push loop for the old key
     setPushed(pushedKey ? loadPushed(localStorage, pushedKey) : {});
     setResults([]);
     setPushState("idle");
@@ -113,6 +118,8 @@ export function QuickBooksCard() {
   const alreadyCount = approved.length - toPush.length;
 
   const pushApproved = useCallback(async () => {
+    pushGeneration.current += 1; // claiming a fresh generation also kills any overlapping run
+    const gen = pushGeneration.current;
     if (connection === null || model === null || toPush.length === 0) return;
     setPushState("pushing");
     const out: PushResult[] = [];
@@ -129,7 +136,7 @@ export function QuickBooksCard() {
           amount: l.amountL!.toNumber(),
         }));
       if (lines.length === 0) {
-        out.push({ partner: p.cardName, tone: "fail", detail: "no billable lines" });
+        out.push({ slug: p.slug, partner: p.cardName, tone: "fail", detail: "no billable lines" });
         setResults([...out]);
         continue;
       }
@@ -141,11 +148,12 @@ export function QuickBooksCard() {
           { partner: p.cardName, docNumber, lines },
           Date.now()
         );
+        if (pushGeneration.current !== gen) return; // stale loop — the close identity changed
         conn = r.conn;
         setConnection(conn);
         const o = r.outcome;
         if (o.kind === "created") {
-          out.push({ partner: p.cardName, tone: "ok", detail: `QBO invoice ${o.qboInvoiceId}` });
+          out.push({ slug: p.slug, partner: p.cardName, tone: "ok", detail: `QBO invoice ${o.qboInvoiceId}` });
           if (pushedKey) {
             setPushed(
               recordPushed(localStorage, pushedKey, p.slug, {
@@ -158,6 +166,7 @@ export function QuickBooksCard() {
           }
         } else if (o.kind === "already") {
           out.push({
+            slug: p.slug,
             partner: p.cardName,
             tone: "muted",
             detail:
@@ -178,25 +187,28 @@ export function QuickBooksCard() {
         } else if (o.kind === "totals-differ") {
           // NOT recorded as pushed — keeps flagging until resolved in QBO.
           out.push({
+            slug: p.slug,
             partner: p.cardName,
             tone: "warn",
             detail: `already in QBO (invoice ${o.qboInvoiceId}) — ours ${usd(o.expectedTotalCents)} vs QBO ${usd(o.qboTotalCents)}, resolve in QuickBooks`,
           });
         } else {
-          out.push({ partner: p.cardName, tone: "fail", detail: o.detail });
+          out.push({ slug: p.slug, partner: p.cardName, tone: "fail", detail: o.detail });
         }
       } catch (e) {
+        if (pushGeneration.current !== gen) return; // the await can also reject after a key change
         if (e instanceof ReconnectRequired) {
-          out.push({ partner: p.cardName, tone: "fail", detail: "session expired — reconnect" });
+          out.push({ slug: p.slug, partner: p.cardName, tone: "fail", detail: "session expired — reconnect" });
           clearConnection(localStorage);
           setConnection(null);
           setResults([...out]);
           break;
         }
-        out.push({ partner: p.cardName, tone: "fail", detail: String(e) });
+        out.push({ slug: p.slug, partner: p.cardName, tone: "fail", detail: String(e) });
       }
       setResults([...out]);
     }
+    if (pushGeneration.current !== gen) return;
     setResults(out);
     setPushState("done");
   }, [connection, model, toPush, period, pushedKey]);
@@ -279,7 +291,7 @@ export function QuickBooksCard() {
         {results.length > 0 && (
           <ul className="space-y-1 text-xs">
             {results.map((r) => (
-              <li key={r.partner} className="flex items-center gap-2">
+              <li key={r.slug} className="flex items-center gap-2">
                 {icon(r.tone)}
                 <span className="font-medium">{r.partner}</span>
                 <span className={r.tone === "warn" ? "text-warning" : "text-muted-foreground"}>
