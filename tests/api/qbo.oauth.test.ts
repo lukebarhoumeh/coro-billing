@@ -47,21 +47,26 @@ describe("GET /api/qbo/callback", () => {
   it("400s when the state cookie is absent or mismatched", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
+    // Numeric realmId so these requests get PAST the realmId guard and pin the
+    // state check itself (asserted via the mismatch message).
     const a = capture();
-    await callback({ query: { code: "c", realmId: "r", state: "s1" }, headers: {} }, a.res);
+    await callback({ query: { code: "c", realmId: "9130357849", state: "s1" }, headers: {} }, a.res);
     expect(a.cap.status).toBe(400);
+    expect((a.cap.body as { error: string }).error).toContain("OAuth state mismatch");
     const b = capture();
     await callback(
-      { query: { code: "c", realmId: "r", state: "s1" }, headers: { cookie: "qbo_oauth_state=OTHER" } },
+      { query: { code: "c", realmId: "9130357849", state: "s1" }, headers: { cookie: "qbo_oauth_state=OTHER" } },
       b.res
     );
     expect(b.cap.status).toBe(400);
+    expect((b.cap.body as { error: string }).error).toContain("OAuth state mismatch");
     const c = capture();
     await callback(
-      { query: { code: "c", realmId: "r" }, headers: { cookie: "qbo_oauth_state=s1" } },
+      { query: { code: "c", realmId: "9130357849" }, headers: { cookie: "qbo_oauth_state=s1" } },
       c.res
     );
     expect(c.cap.status).toBe(400);
+    expect((c.cap.body as { error: string }).error).toContain("OAuth state mismatch");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
