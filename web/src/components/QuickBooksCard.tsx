@@ -1,60 +1,74 @@
 /**
  * QuickBooks Online integration — connect + push approved invoices.
  *
- * Tokens live in THIS browser's localStorage (handed over by the OAuth popup
- * via postMessage); the serverless functions under /api/qbo are stateless
- * pass-throughs holding only the app credentials. Push is one invoice per
- * call so the accounting team sees per-partner success/failure, not a blob.
+ * v2: the connection auto-renews (web/src/lib/qbo.ts owns the token lifecycle;
+ * Intuit rotates refresh tokens, the helper persists every rotation) and push
+ * is dedup-aware — the server skips invoices that already exist in QBO and
+ * flags totals differences instead of ever rewriting a ledger. Known-pushed
+ * invoices (per period + file fingerprints) are skipped client-side.
  *
  * When the deployment has no QBO env configured, /api/qbo/connect answers 503
  * and this card explains what's missing instead of pretending.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CircleCheck, CircleX, Link2, Loader2, Send } from "lucide-react";
-import { Money } from "@pipeline/lib/money.js";
+import { CircleCheck, CircleX, Link2, Loader2, Send, TriangleAlert } from "lucide-react";
 import { useClose } from "@/lib/closeStore";
-import { money } from "@/lib/format";
+import {
+  ReconnectRequired,
+  clearConnection,
+  loadConnection,
+  loadPushed,
+  persistConnection,
+  pushInvoice,
+  qboPushedStorageKey,
+  recordPushed,
+  type PushedState,
+  type QboConnection,
+} from "@/lib/qbo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-const STORAGE_KEY = "qbo-connection";
-
-interface QboConnection {
-  readonly realmId: string;
-  readonly accessToken: string;
-  readonly refreshToken: string;
-  readonly expiresAt: number;
-}
-
-function loadConnection(): QboConnection | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const c = JSON.parse(raw) as QboConnection;
-    return c.expiresAt > Date.now() ? c : null; // expired = disconnected (v1: no refresh flow)
-  } catch {
-    return null;
-  }
-}
+const usd = (cents: number): string =>
+  (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 type PushState = "idle" | "pushing" | "done";
+type Tone = "ok" | "muted" | "warn" | "fail";
 interface PushResult {
   readonly partner: string;
-  readonly ok: boolean;
+  readonly tone: Tone;
   readonly detail: string;
 }
 
 export function QuickBooksCard() {
-  const { model, review, period, demo } = useClose();
-  const [connection, setConnection] = useState<QboConnection | null>(() => loadConnection());
+  const { model, review, period, demo, files } = useClose();
+  const [connection, setConnection] = useState<QboConnection | null>(() =>
+    loadConnection(localStorage, Date.now())
+  );
   const [connectError, setConnectError] = useState<string | null>(null);
   const [pushState, setPushState] = useState<PushState>("idle");
   const [results, setResults] = useState<readonly PushResult[]>([]);
 
+  // Pushed-state is keyed like review state: period + file fingerprints, so a
+  // changed pricing file naturally resets it and the server dedup takes over.
+  const pushedKey = useMemo(
+    () =>
+      files.pricing && files.usage
+        ? qboPushedStorageKey(period, files.pricing.fingerprint, files.usage.fingerprint)
+        : null,
+    [files.pricing, files.usage, period]
+  );
+  const [pushed, setPushed] = useState<PushedState>({});
+  useEffect(() => {
+    setPushed(pushedKey ? loadPushed(localStorage, pushedKey) : {});
+    setResults([]);
+    setPushState("idle");
+  }, [pushedKey]);
+
   // Receive tokens from the OAuth popup.
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return; // only our own popup may hand us tokens
       const d = e.data as { type?: string } & QboConnection;
       if (d?.type === "qbo-connected" && d.realmId && d.accessToken) {
         const c: QboConnection = {
@@ -62,12 +76,9 @@ export function QuickBooksCard() {
           accessToken: d.accessToken,
           refreshToken: d.refreshToken,
           expiresAt: d.expiresAt,
+          refreshTokenExpiresAt: d.refreshTokenExpiresAt,
         };
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(c));
-        } catch {
-          // storage full/private mode — session-only connection still works
-        }
+        persistConnection(localStorage, c);
         setConnection(c);
         setConnectError(null);
       }
@@ -88,11 +99,7 @@ export function QuickBooksCard() {
   }, []);
 
   const disconnect = useCallback(() => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // best-effort
-    }
+    clearConnection(localStorage);
     setConnection(null);
     setResults([]);
     setPushState("idle");
@@ -102,12 +109,15 @@ export function QuickBooksCard() {
     () => (model?.partners ?? []).filter((p) => review[p.slug]?.status === "approved"),
     [model, review]
   );
+  const toPush = useMemo(() => approved.filter((p) => !pushed[p.slug]), [approved, pushed]);
+  const alreadyCount = approved.length - toPush.length;
 
   const pushApproved = useCallback(async () => {
-    if (connection === null || model === null || approved.length === 0) return;
+    if (connection === null || model === null || toPush.length === 0) return;
     setPushState("pushing");
     const out: PushResult[] = [];
-    for (const p of approved) {
+    let conn = connection;
+    for (const p of toPush) {
       const index = model.partners.findIndex((x) => x.slug === p.slug);
       const docNumber = `HUB-${period.replace("-", "")}-${String(index + 1).padStart(3, "0")}`;
       const lines = p.lines
@@ -119,41 +129,93 @@ export function QuickBooksCard() {
           amount: l.amountL!.toNumber(),
         }));
       if (lines.length === 0) {
-        out.push({ partner: p.cardName, ok: false, detail: "no billable lines" });
+        out.push({ partner: p.cardName, tone: "fail", detail: "no billable lines" });
+        setResults([...out]);
         continue;
       }
+      const totalCents = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100);
       try {
-        const res = await fetch("/api/qbo/push", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            realmId: connection.realmId,
-            accessToken: connection.accessToken,
-            invoice: { partner: p.cardName, docNumber, lines },
-          }),
-        });
-        const body = (await res.json().catch(() => null)) as
-          | { ok?: boolean; qboInvoiceId?: string; error?: string }
-          | null;
-        if (res.ok && body?.ok) {
-          out.push({ partner: p.cardName, ok: true, detail: `QBO invoice ${body.qboInvoiceId}` });
-        } else {
-          out.push({ partner: p.cardName, ok: false, detail: body?.error ?? `HTTP ${res.status}` });
-          if (res.status === 401) {
-            setConnection(null); // token died mid-run — stop pretending
-            break;
+        const r = await pushInvoice(
+          localStorage,
+          conn,
+          { partner: p.cardName, docNumber, lines },
+          Date.now()
+        );
+        conn = r.conn;
+        setConnection(conn);
+        const o = r.outcome;
+        if (o.kind === "created") {
+          out.push({ partner: p.cardName, tone: "ok", detail: `QBO invoice ${o.qboInvoiceId}` });
+          if (pushedKey) {
+            setPushed(
+              recordPushed(localStorage, pushedKey, p.slug, {
+                qboInvoiceId: o.qboInvoiceId,
+                docNumber,
+                totalCents,
+                at: Date.now(),
+              })
+            );
           }
+        } else if (o.kind === "already") {
+          out.push({
+            partner: p.cardName,
+            tone: "muted",
+            detail:
+              o.duplicateCount > 1
+                ? `already in QBO — ${o.duplicateCount} invoices carry this period (first: ${o.qboInvoiceId})`
+                : `already in QBO — invoice ${o.qboInvoiceId}`,
+          });
+          if (pushedKey) {
+            setPushed(
+              recordPushed(localStorage, pushedKey, p.slug, {
+                qboInvoiceId: o.qboInvoiceId,
+                docNumber: o.qboDocNumber ?? docNumber,
+                totalCents,
+                at: Date.now(),
+              })
+            );
+          }
+        } else if (o.kind === "totals-differ") {
+          // NOT recorded as pushed — keeps flagging until resolved in QBO.
+          out.push({
+            partner: p.cardName,
+            tone: "warn",
+            detail: `already in QBO (invoice ${o.qboInvoiceId}) — ours ${usd(o.expectedTotalCents)} vs QBO ${usd(o.qboTotalCents)}, resolve in QuickBooks`,
+          });
+        } else {
+          out.push({ partner: p.cardName, tone: "fail", detail: o.detail });
         }
       } catch (e) {
-        out.push({ partner: p.cardName, ok: false, detail: String(e) });
+        if (e instanceof ReconnectRequired) {
+          out.push({ partner: p.cardName, tone: "fail", detail: "session expired — reconnect" });
+          clearConnection(localStorage);
+          setConnection(null);
+          setResults([...out]);
+          break;
+        }
+        out.push({ partner: p.cardName, tone: "fail", detail: String(e) });
       }
       setResults([...out]);
     }
     setResults(out);
     setPushState("done");
-  }, [connection, model, approved, period]);
+  }, [connection, model, toPush, period, pushedKey]);
 
   if (model === null) return null;
+
+  const icon = (tone: Tone) =>
+    tone === "ok" ? (
+      <CircleCheck className="h-3.5 w-3.5 shrink-0 text-success" />
+    ) : tone === "muted" ? (
+      <CircleCheck className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+    ) : tone === "warn" ? (
+      <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-warning" />
+    ) : (
+      <CircleX className="h-3.5 w-3.5 shrink-0 text-danger" />
+    );
+
+  const createdCount = results.filter((r) => r.tone === "ok").length;
+  const flaggedCount = results.filter((r) => r.tone === "warn").length;
 
   return (
     <Card>
@@ -161,7 +223,7 @@ export function QuickBooksCard() {
         <CardTitle className="flex items-center gap-2 normal-case tracking-normal text-foreground">
           <span className="text-sm font-medium">QuickBooks Online</span>
           {connection !== null ? (
-            <Badge variant="success">connected</Badge>
+            <Badge variant="success">connected · auto-renews</Badge>
           ) : (
             <Badge variant="muted">not connected</Badge>
           )}
@@ -171,7 +233,9 @@ export function QuickBooksCard() {
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
           Pushes each <b>approved</b> draft as a QuickBooks invoice (customer created by partner
-          name if missing). File exports (CSV/IIF) remain available above.
+          name if missing). Invoices already in QBO are skipped — never rewritten; totals
+          differences are flagged for manual resolution. File exports (CSV/IIF) remain available
+          above.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {connection === null ? (
@@ -183,7 +247,7 @@ export function QuickBooksCard() {
             <>
               <Button
                 data-testid="qbo-push"
-                disabled={pushState === "pushing" || approved.length === 0 || demo}
+                disabled={pushState === "pushing" || toPush.length === 0 || demo}
                 onClick={() => void pushApproved()}
               >
                 {pushState === "pushing" ? (
@@ -191,12 +255,17 @@ export function QuickBooksCard() {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                Push {approved.length} approved invoice{approved.length === 1 ? "" : "s"}
+                Push {toPush.length} approved invoice{toPush.length === 1 ? "" : "s"}
               </Button>
               <Button variant="ghost" data-testid="qbo-disconnect" onClick={disconnect}>
                 Disconnect
               </Button>
             </>
+          )}
+          {alreadyCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {alreadyCount} already pushed ✓
+            </span>
           )}
           {approved.length === 0 && connection !== null && (
             <span className="text-xs text-muted-foreground">approve drafts first</span>
@@ -211,22 +280,22 @@ export function QuickBooksCard() {
           <ul className="space-y-1 text-xs">
             {results.map((r) => (
               <li key={r.partner} className="flex items-center gap-2">
-                {r.ok ? (
-                  <CircleCheck className="h-3.5 w-3.5 shrink-0 text-success" />
-                ) : (
-                  <CircleX className="h-3.5 w-3.5 shrink-0 text-danger" />
-                )}
+                {icon(r.tone)}
                 <span className="font-medium">{r.partner}</span>
-                <span className="text-muted-foreground">{r.detail}</span>
+                <span className={r.tone === "warn" ? "text-warning" : "text-muted-foreground"}>
+                  {r.detail}
+                </span>
               </li>
             ))}
           </ul>
         )}
-        {pushState === "done" && results.every((r) => r.ok) && results.length > 0 && (
+        {pushState === "done" && results.length > 0 && results.every((r) => r.tone !== "fail") && (
           <p className="text-xs text-success">
-            All {results.length} invoices created —{" "}
-            {money(approved.reduce((s, p) => s.add(p.totalL), Money.zero()))} total now in
-            QuickBooks.
+            Push complete — {createdCount} created
+            {results.length - createdCount - flaggedCount > 0 &&
+              `, ${results.length - createdCount - flaggedCount} already in QBO`}
+            {flaggedCount > 0 && `, ${flaggedCount} flagged (totals differ)`}
+            .
           </p>
         )}
       </CardContent>
