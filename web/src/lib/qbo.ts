@@ -78,9 +78,17 @@ async function refreshTokens(c: QboConnection): Promise<QboConnection> {
     refreshToken?: string;
     expiresAt?: number;
     refreshTokenExpiresAt?: number;
+    error?: string;
   } | null;
-  if (!res.ok || !body?.ok || !body.accessToken || !body.refreshToken) {
+  if (res.status === 401 || res.status === 400) {
+    // The refresh token itself is dead (expired/revoked) — reconnect is honest.
     throw new ReconnectRequired();
+  }
+  if (!res.ok || !body?.ok || !body.accessToken || !body.refreshToken) {
+    // Transient (Intuit 5xx, missing env, malformed body): fail this attempt
+    // WITHOUT killing the stored connection — retrying later is safe because
+    // rotation only happens on success.
+    throw new Error(body?.error !== undefined ? `QuickBooks refresh failed: ${body.error}` : `QuickBooks refresh failed (HTTP ${res.status})`);
   }
   return {
     realmId: c.realmId,
@@ -147,6 +155,10 @@ async function postPush(
  * Push one invoice. Proactively refreshes near expiry; on a 401 refreshes once
  * and retries once. Returns the outcome plus the (possibly rotated) connection.
  * Throws ReconnectRequired when the session is truly dead.
+ *
+ * Constraint: do not run concurrent pushInvoice calls against the same store —
+ * Intuit invalidates the old refresh token on rotation, so interleaved
+ * refreshes brick the connection. Thread the returned conn into the next call.
  */
 export async function pushInvoice(
   store: KV,
@@ -212,7 +224,9 @@ export function qboPushedStorageKey(period: string, pricingFp: string, usageFp: 
 export function loadPushed(store: KV, key: string): PushedState {
   try {
     const raw = store.getItem(key);
-    return raw ? (JSON.parse(raw) as PushedState) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    return typeof parsed === "object" && parsed !== null ? (parsed as PushedState) : {};
   } catch {
     return {};
   }

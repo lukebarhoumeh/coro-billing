@@ -101,6 +101,29 @@ describe("ensureFresh", () => {
     const c = { ...CONN, expiresAt: NOW - 1 };
     await expect(ensureFresh(kv, c, NOW)).rejects.toBeInstanceOf(ReconnectRequired);
   });
+
+  it("keeps the connection on a transient refresh failure (Intuit 5xx)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({ error: "Intuit token refresh failed" }) })
+    );
+    const kv = memoryKV();
+    const c = { ...CONN, expiresAt: NOW - 1 };
+    const err = await ensureFresh(kv, c, NOW).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(ReconnectRequired);
+    expect((err as Error).message).toContain("Intuit token refresh failed");
+  });
+
+  it("treats a refresh 400 as a dead session (invalid_grant)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: "invalid_grant" }) })
+    );
+    const kv = memoryKV();
+    const c = { ...CONN, expiresAt: NOW - 1 };
+    await expect(ensureFresh(kv, c, NOW)).rejects.toBeInstanceOf(ReconnectRequired);
+  });
 });
 
 describe("pushInvoice", () => {
@@ -177,6 +200,9 @@ describe("pushInvoice", () => {
     expect(outcome).toEqual({ kind: "created", qboInvoiceId: "9" });
     expect(conn.accessToken).toBe("A2");
     expect(calls).toEqual(["/api/qbo/push", "/api/qbo/refresh", "/api/qbo/push"]);
+    // The rotated pair must be in storage BEFORE the retried call could ever
+    // observe it — pinning the persist at the reactive (401) path.
+    expect((JSON.parse(kv.map.get(QBO_CONNECTION_KEY)!) as QboConnection).refreshToken).toBe("R2");
   });
 
   it("throws ReconnectRequired when the retry also 401s", async () => {
