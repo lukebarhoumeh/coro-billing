@@ -16,7 +16,9 @@ credentials. Nothing about the close is stored server-side.
    form requires live EULA and Privacy Policy URLs — use
    `https://coro-billing.vercel.app/legal/eula.html` and
    `https://coro-billing.vercel.app/legal/privacy.html` (served from
-   `web/public/legal/`).
+   `web/public/legal/`). The disconnect URL is
+   `https://coro-billing.vercel.app/disconnected.html` (static landing page,
+   `web/public/disconnected.html`); launch URL is the site root.
 3. Add the **Redirect URI** (must match exactly):
    `https://coro-billing.vercel.app/api/qbo/callback`
 

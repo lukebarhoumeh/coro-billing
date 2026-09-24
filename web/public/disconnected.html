@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,450;9..144,550;9..144,650&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <title>QuickBooks disconnected — MSP Hub Coro Billing</title>
+    <meta
+      name="description"
+      content="Your QuickBooks Online connection to the MSP Hub Coro Billing workbench has been disconnected."
+    />
+    <style>
+      :root {
+        --background: 225 32% 6%;
+        --foreground: 40 24% 94%;
+        --muted-foreground: 222 12% 64%;
+        --border: 224 18% 17%;
+        --brass: 41 62% 60%;
+        --accent: 210 65% 62%;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: hsl(var(--background));
+        background-image:
+          radial-gradient(1200px 600px at 18% -10%, hsl(41 62% 60% / 0.05), transparent 60%),
+          radial-gradient(900px 500px at 90% 110%, hsl(210 65% 62% / 0.04), transparent 55%);
+        background-attachment: fixed;
+        color: hsl(var(--foreground));
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.65;
+      }
+      main {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 5rem 1.5rem;
+      }
+      .eyebrow {
+        font-size: 0.75rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: hsl(var(--brass));
+        margin: 0 0 0.75rem;
+      }
+      h1 {
+        font-family: "Fraunces", Georgia, serif;
+        font-weight: 550;
+        font-size: 2.1rem;
+        line-height: 1.2;
+        margin: 0 0 1.25rem;
+      }
+      p {
+        color: hsl(40 14% 84%);
+        font-size: 0.975rem;
+      }
+      a {
+        color: hsl(var(--accent));
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .button {
+        display: inline-block;
+        margin-top: 1.5rem;
+        padding: 0.6rem 1.1rem;
+        border-radius: 0.6rem;
+        background: hsl(var(--brass));
+        color: hsl(228 40% 8%);
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+      .button:hover {
+        text-decoration: none;
+        filter: brightness(1.06);
+      }
+      footer {
+        margin-top: 3.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid hsl(var(--border));
+        color: hsl(var(--muted-foreground));
+        font-size: 0.85rem;
+      }
+      footer nav a {
+        margin-right: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">MSP Hub · Coro Billing</p>
+      <h1>QuickBooks disconnected</h1>
+      <p>
+        Your QuickBooks Online connection to the Coro Billing workbench has
+        been disconnected, and its access to your company file has been
+        revoked at Intuit. The workbench can no longer create invoices in
+        QuickBooks on your behalf.
+      </p>
+      <p>
+        Nothing else changes: your billing files and review work live in your
+        own browser and are unaffected. To connect again, open the workbench
+        and choose <strong>Connect QuickBooks</strong> on the Invoices screen.
+      </p>
+      <a class="button" href="/">Back to the workbench</a>
+      <footer>
+        <nav>
+          <a href="/">Workbench</a>
+          <a href="/legal/eula.html">EULA</a>
+          <a href="/legal/privacy.html">Privacy Policy</a>
+        </nav>
+        © 2026 MSP Hub, LLC. QuickBooks is a registered trademark of Intuit
+        Inc., used here to identify the integration only.
+      </footer>
+    </main>
+  </body>
+</html>
