@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,450;9..144,550;9..144,650&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <title>Privacy Policy — MSP Hub Coro Billing</title>
+    <meta
+      name="description"
+      content="Privacy Policy for the MSP Hub Coro Billing workbench."
+    />
+    <style>
+      :root {
+        --background: 225 32% 6%;
+        --foreground: 40 24% 94%;
+        --muted-foreground: 222 12% 64%;
+        --border: 224 18% 17%;
+        --brass: 41 62% 60%;
+        --accent: 210 65% 62%;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: hsl(var(--background));
+        background-image:
+          radial-gradient(1200px 600px at 18% -10%, hsl(41 62% 60% / 0.05), transparent 60%),
+          radial-gradient(900px 500px at 90% 110%, hsl(210 65% 62% / 0.04), transparent 55%);
+        background-attachment: fixed;
+        color: hsl(var(--foreground));
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.65;
+      }
+      main {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 4rem 1.5rem 5rem;
+      }
+      .eyebrow {
+        font-size: 0.75rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: hsl(var(--brass));
+        margin: 0 0 0.75rem;
+      }
+      h1 {
+        font-family: "Fraunces", Georgia, serif;
+        font-weight: 550;
+        font-size: 2.1rem;
+        line-height: 1.2;
+        margin: 0 0 0.35rem;
+      }
+      .effective {
+        color: hsl(var(--muted-foreground));
+        font-size: 0.9rem;
+        margin: 0 0 2.5rem;
+      }
+      h2 {
+        font-family: "Fraunces", Georgia, serif;
+        font-weight: 550;
+        font-size: 1.25rem;
+        margin: 2.4rem 0 0.6rem;
+        padding-top: 1.6rem;
+        border-top: 1px solid hsl(var(--border));
+      }
+      p,
+      li {
+        color: hsl(40 14% 84%);
+        font-size: 0.975rem;
+      }
+      ul {
+        padding-left: 1.25rem;
+      }
+      a {
+        color: hsl(var(--accent));
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      strong {
+        color: hsl(var(--foreground));
+      }
+      footer {
+        margin-top: 3.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid hsl(var(--border));
+        color: hsl(var(--muted-foreground));
+        font-size: 0.85rem;
+      }
+      footer nav {
+        margin-bottom: 0.75rem;
+      }
+      footer nav a {
+        margin-right: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">MSP Hub · Coro Billing</p>
+      <h1>Privacy Policy</h1>
+      <p class="effective">Effective September 24, 2026</p>
+
+      <p>
+        This policy describes how <strong>MSP Hub, LLC</strong> (“MSP Hub”,
+        “we”, “us”) handles information in connection with the Coro Billing
+        workbench at
+        <a href="https://coro-billing.vercel.app">coro-billing.vercel.app</a>
+        (the “Service”), an internal billing tool used by MSP Hub accounting
+        staff and authorized collaborators. The short version: the Service was
+        built to keep your data on your machine —
+        <strong>billing files are processed entirely in your browser, and our
+        servers store nothing about your billing close.</strong>
+      </p>
+
+      <h2>1. Billing files stay in your browser</h2>
+      <p>
+        The usage reports, vendor invoices, and pricing sheets you load into
+        the Service are read and processed locally by your browser. They are
+        <strong>never uploaded to, or stored on, our servers</strong>. Draft
+        invoices, review and approval state, and related working data are kept
+        in your browser’s local storage on your device and never leave it.
+      </p>
+
+      <h2>2. QuickBooks Online connection</h2>
+      <p>
+        You can optionally connect the Service to QuickBooks Online through
+        Intuit’s OAuth 2.0 authorization flow.
+      </p>
+      <ul>
+        <li>
+          The access and refresh tokens Intuit issues are stored
+          <strong>only in your browser’s local storage</strong> — per browser,
+          per device. Our serverless endpoints relay the authorization and
+          token-refresh exchange to Intuit and pass tokens back to your
+          browser without retaining them.
+        </li>
+        <li>
+          During sign-in, a short-lived (10-minute) HttpOnly cookie holds a
+          random value used solely to protect the OAuth flow against
+          cross-site request forgery. It is not used for tracking.
+        </li>
+        <li>
+          When you push approved invoices, the Service uses your tokens to
+          create invoices — and, if needed, customer records — in the
+          QuickBooks company file you connected, and to look up existing
+          invoices so re-pushes never create duplicates. It reads and writes
+          nothing else in your company file, and it never updates, voids, or
+          deletes existing QuickBooks records.
+        </li>
+      </ul>
+      <p>
+        Data you send to QuickBooks is handled by Intuit under
+        <a href="https://www.intuit.com/privacy/statement/">Intuit’s privacy
+        statement</a>.
+      </p>
+
+      <h2>3. What our servers store</h2>
+      <p>
+        Nothing. The Service has no user accounts and no database. Its
+        serverless functions are stateless: they hold only the application’s
+        own Intuit credentials (as deployment configuration) and process each
+        request without persisting your data.
+      </p>
+
+      <h2>4. Service providers</h2>
+      <ul>
+        <li>
+          <strong>Vercel</strong> hosts the site and serverless functions
+          (United States). Like any host, Vercel may generate standard
+          operational logs (such as IP address and request metadata) under
+          <a href="https://vercel.com/legal/privacy-policy">Vercel’s privacy
+          policy</a>.
+        </li>
+        <li>
+          <strong>Google Fonts</strong> serves the Service’s typefaces; your
+          browser requests font files from Google when a page loads.
+        </li>
+        <li>
+          <strong>Intuit</strong> processes the QuickBooks authorization and
+          invoice requests described above.
+        </li>
+      </ul>
+      <p>
+        The Service uses <strong>no analytics, no advertising, and no
+        tracking cookies</strong>. We do not sell or share personal
+        information for advertising purposes.
+      </p>
+
+      <h2>5. Retention and deletion</h2>
+      <p>
+        Because we store nothing server-side, deletion is in your hands:
+        clearing the site’s data in your browser removes all working data,
+        tokens, and pushed-invoice state from your device. You can revoke the
+        Service’s QuickBooks access at any time from your Intuit account’s
+        connected-apps settings, which invalidates its tokens. Invoices
+        already created in QuickBooks remain in your company file under your
+        control.
+      </p>
+
+      <h2>6. Security</h2>
+      <p>
+        All traffic to the Service uses HTTPS. OAuth state is protected with
+        an HttpOnly cookie, tokens are confined to your browser, and the
+        serverless endpoints validate requests and hold no persistent state.
+        No method of transmission or storage is perfectly secure, but the
+        Service’s design minimizes what there is to protect: your billing
+        data simply never reaches us.
+      </p>
+
+      <h2>7. Children</h2>
+      <p>
+        The Service is a business tool and is not directed at children under
+        16. We do not knowingly collect information from children.
+      </p>
+
+      <h2>8. Changes</h2>
+      <p>
+        We may update this policy from time to time. The current version is
+        always available at this URL, and the effective date above reflects
+        the latest revision.
+      </p>
+
+      <h2>9. Contact</h2>
+      <p>
+        Privacy questions:
+        <a href="mailto:lukebarhoumeh11@gmail.com">lukebarhoumeh11@gmail.com</a>.
+      </p>
+
+      <footer>
+        <nav>
+          <a href="/">Workbench</a>
+          <a href="/legal/eula.html">EULA</a>
+          <a href="/legal/privacy.html">Privacy Policy</a>
+        </nav>
+        © 2026 MSP Hub, LLC. QuickBooks is a registered trademark of Intuit
+        Inc., used here to identify the integration only.
+      </footer>
+    </main>
+  </body>
+</html>

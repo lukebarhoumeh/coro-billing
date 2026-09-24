@@ -12,7 +12,11 @@ credentials. Nothing about the close is stored server-side.
    account → **Create an app** → *QuickBooks Online and Payments*.
 2. Under **Keys & credentials**, note the **Client ID** and **Client Secret**.
    Start with the *Development* keys against a sandbox company; switch to the
-   *Production* keys after a successful test run.
+   *Production* keys after a successful test run. Intuit's production-keys
+   form requires live EULA and Privacy Policy URLs — use
+   `https://coro-billing.vercel.app/legal/eula.html` and
+   `https://coro-billing.vercel.app/legal/privacy.html` (served from
+   `web/public/legal/`).
 3. Add the **Redirect URI** (must match exactly):
    `https://coro-billing.vercel.app/api/qbo/callback`
 
