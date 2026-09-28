@@ -8,11 +8,19 @@
  * GP = the model's Money margin; GM% always via gmPct() — never local math.
  * All figures come straight off the CloseModel; HELD lines are excluded from
  * every total and surfaced separately — never rendered as zero-dollar rows.
+ *
+ * MoM layer: once a prior month sits in the local close archive, the KPI cards
+ * grow sparklines + vs-prior delta chips and the partner table a "vs <prev>"
+ * column — all computed from CloseSnapshots (the live model snapshotted on the
+ * fly vs the archived month right before it). Nothing is persisted here.
  */
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Archive, CircleAlert, Scale } from "lucide-react";
 import { Money, sum } from "@pipeline/lib/money.js";
 import type { CloseModel, PartnerDraft } from "@pipeline/domain/types.js";
+import { snapshotFromClose, type CloseSnapshot } from "@pipeline/domain/snapshot.js";
+import { CONFIRMED_RATES_REVISION } from "@pipeline/config/confirmedRates.js";
+import { partnerDeltas, trendSeries, type PartnerDelta } from "@pipeline/close/trends.js";
 import { useClose } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
 import { money, gmPct, pct } from "@/lib/format";
@@ -21,9 +29,58 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GlassPanel } from "@/components/glass/GlassPanel";
 import { KpiCard } from "@/components/glass/KpiCard";
+import { Sparkline } from "@/components/glass/Sparkline";
+import { TrendChip, type TrendTone } from "@/components/glass/TrendChip";
 import { cn } from "@/lib/cn";
 
 const SEVERITIES = ["block", "warn", "info"] as const;
+
+// ---- MoM helpers (render-side of src/close/trends.ts — no local business math) ----
+
+const MONTHS_SHORT: readonly string[] = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** "2026-07" → "Jul" for compact vs-prior chips. */
+function periodShort(period: string): string {
+  return MONTHS_SHORT[Number(period.slice(5, 7)) - 1] ?? period;
+}
+
+/** Snapshot money string → integer cents (snapshots serialize Money as toFixed2). */
+function centsOf(fixed: string): number {
+  return Math.round(Number(fixed) * 100);
+}
+
+/** Actual-else-expected cost, matching the blended basis the cost KPI displays. */
+function blendedCostCents(t: CloseSnapshot["totals"]): number {
+  return centsOf(t.costActual ?? t.costExpected);
+}
+
+/** KPI delta chip: signed % vs the prior archived month; nothing when the base is zero. */
+function momDelta(currCents: number, prevCents: number, prevShort: string): ReactNode {
+  if (prevCents === 0) return undefined; // no basis — skip rather than mislead
+  const pctDelta = Math.round(((currCents - prevCents) / Math.abs(prevCents)) * 1000) / 10;
+  const tone: TrendTone = pctDelta > 0 ? "up" : pctDelta < 0 ? "down" : "flat";
+  return (
+    <TrendChip tone={tone}>
+      {pctDelta > 0 ? "+" : pctDelta < 0 ? "−" : ""}
+      {Math.abs(pctDelta)}% vs {prevShort}
+    </TrendChip>
+  );
+}
+
+/** Partner-row vs-prior chip; em-dash when the prior month offers no comparable base. */
+function partnerVsPrior(delta: PartnerDelta | undefined): ReactNode {
+  if (delta === undefined) return <span className="text-xs text-muted-foreground">—</span>;
+  if (delta.kind === "new") return <TrendChip tone="new" />;
+  const tone: TrendTone = delta.pct > 0 ? "up" : delta.pct < 0 ? "down" : "flat";
+  return (
+    <TrendChip tone={tone}>
+      {delta.pct > 0 ? "+" : delta.pct < 0 ? "−" : ""}
+      {Math.abs(delta.pct)}%
+    </TrendChip>
+  );
+}
 
 /** One segment of the GP-concentration strip (a positive-GP partner, or "others"). */
 interface GpSegment {
@@ -153,12 +210,62 @@ function aggregate(model: CloseModel): Aggregates {
 }
 
 export function OverviewScreen({ onNavigate }: ScreenProps) {
-  const { model, period, archivePromptDue, saveCurrentToArchive } = useClose();
+  const { model, period, files, archivePeriods, archivePromptDue, saveCurrentToArchive, loadArchived } =
+    useClose();
   // Archive save feedback + banner dismissal (session-local; the store owns the flag).
   const [savedPeriod, setSavedPeriod] = useState<string | null>(null);
   const [promptDismissed, setPromptDismissed] = useState(false);
+
+  // MoM layer — the live close snapshotted on the fly vs the archived month
+  // right before it. Clock use is fine here (UI layer); savedAt never renders
+  // and this snapshot is never persisted from this screen.
+  const mom = useMemo(() => {
+    if (model === null || files.pricing === undefined || files.usage === undefined) return null;
+    const fp = {
+      pricing: files.pricing.fingerprint.slice(0, 12),
+      usage: files.usage.fingerprint.slice(0, 12),
+      ...(files.invoice !== undefined ? { invoice: files.invoice.fingerprint.slice(0, 12) } : {}),
+    };
+    const currSnap = snapshotFromClose(model, fp, CONFIRMED_RATES_REVISION, new Date().toISOString());
+    const prevPeriod = archivePeriods.filter((p) => p < period).at(-1) ?? null;
+    const prevSnap = prevPeriod !== null ? loadArchived(prevPeriod) : null;
+    return {
+      prev: prevPeriod !== null && prevSnap !== null ? { period: prevPeriod, totals: prevSnap.totals } : null,
+      currTotals: currSnap.totals,
+      deltas: partnerDeltas(currSnap, prevSnap),
+      // Every archived month + the live close (the current model wins its own period).
+      series: trendSeries([
+        ...archivePeriods.filter((p) => p !== period).map((p) => loadArchived(p)!),
+        currSnap,
+      ]),
+    };
+  }, [model, files, archivePeriods, period, loadArchived]);
+
   if (model === null) return null; // App gates on the model; belt-and-suspenders.
   const a = aggregate(model);
+
+  // Sparklines need two months of history; delta chips need the prior month.
+  const sparks =
+    mom !== null && mom.series.length >= 2
+      ? {
+          billed: <Sparkline values={mom.series.map((p) => p.billedCents)} />,
+          cost: (
+            <Sparkline dashed values={mom.series.map((p) => p.costActualCents ?? p.costExpectedCents)} />
+          ),
+          gp: <Sparkline color="hsl(var(--success))" values={mom.series.map((p) => p.marginCents)} />,
+        }
+      : null;
+  const vsPrior =
+    mom !== null && mom.prev !== null
+      ? {
+          short: periodShort(mom.prev.period),
+          prevTotals: mom.prev.totals,
+          currTotals: mom.currTotals,
+          deltas: mom.deltas,
+        }
+      : null;
+  const kpiDelta = (pick: (t: CloseSnapshot["totals"]) => number): ReactNode =>
+    vsPrior !== null ? momDelta(pick(vsPrior.currTotals), pick(vsPrior.prevTotals), vsPrior.short) : undefined;
 
   const handleSaveToArchive = () => {
     const res = saveCurrentToArchive();
@@ -223,19 +330,34 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
         </div>
       )}
 
-      {/* KPI strip — 4 glass cards (spec §2). delta/spark arrive with the MoM layer. */}
+      {/* KPI strip — 4 glass cards (spec §2). Sparklines with ≥2 archived+live
+          months; delta chips vs the archived month right before this one. */}
       <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         <div className="fade-up" style={{ animationDelay: "40ms" }}>
-          <KpiCard label="Billed to partners" value={money(a.billed)} hero animate />
+          <KpiCard
+            label="Billed to partners"
+            value={money(a.billed)}
+            hero
+            animate
+            spark={sparks?.billed}
+            delta={kpiDelta((t) => centsOf(t.billedL))}
+          />
         </div>
         <div className="fade-up" style={{ animationDelay: "80ms" }}>
-          <KpiCard label={costLabel} value={money(a.costBlended)} />
+          <KpiCard
+            label={costLabel}
+            value={money(a.costBlended)}
+            spark={sparks?.cost}
+            delta={kpiDelta(blendedCostCents)}
+          />
         </div>
         <div className="fade-up" style={{ animationDelay: "120ms" }}>
           <KpiCard
             label="Gross profit (GP)"
             value={money(a.margin)}
             valueClassName={marginNegative ? "text-danger" : "text-success"}
+            spark={sparks?.gp}
+            delta={kpiDelta((t) => centsOf(t.margin))}
           />
         </div>
         <div className="fade-up" style={{ animationDelay: "160ms" }}>
@@ -243,6 +365,7 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
             label="Coro credit expected"
             value={money(creditExpected)}
             valueClassName={creditExpected.isZero() ? "text-muted-foreground" : "text-primary"}
+            delta={kpiDelta((t) => centsOf(t.creditExpected))}
           />
         </div>
       </div>
@@ -425,6 +548,12 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
                         {gmPct(p.totalMargin, p.totalL)}
                       </Badge>
                     </span>
+                    {/* vs-prior column — only once a prior month is archived. */}
+                    {vsPrior !== null && (
+                      <span className="w-20 shrink-0 text-right">
+                        {partnerVsPrior(vsPrior.deltas.get(p.slug))}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -437,6 +566,9 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
                 <span className="microlabel w-28 text-right">billed</span>
                 <span className="microlabel w-28 text-right">GP</span>
                 <span className="microlabel w-16 text-right">GM</span>
+                {vsPrior !== null && (
+                  <span className="microlabel w-20 text-right">vs {vsPrior.short}</span>
+                )}
               </span>
             </div>
           </div>
