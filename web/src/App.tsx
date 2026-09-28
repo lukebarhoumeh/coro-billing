@@ -11,6 +11,7 @@ import { useMemo, useState, type ComponentType } from "react";
 import {
   Inbox,
   LayoutDashboard,
+  LineChart,
   BadgeDollarSign,
   Scale,
   FileText,
@@ -26,6 +27,7 @@ import { CloseChecklist } from "@/components/CloseChecklist";
 import { HelpDialog } from "@/components/HelpDialog";
 import { IntakeScreen } from "@/screens/Intake";
 import { OverviewScreen } from "@/screens/Overview";
+import { TrendsScreen } from "@/screens/Trends";
 import { RateCardsScreen } from "@/screens/RateCards";
 import { ReconcileScreen } from "@/screens/Reconcile";
 import { InvoicesScreen } from "@/screens/Invoices";
@@ -43,6 +45,8 @@ interface Section {
 const SECTIONS: readonly Section[] = [
   { key: "intake", label: "Intake", icon: Inbox, Screen: IntakeScreen, needsModel: false },
   { key: "overview", label: "Overview", icon: LayoutDashboard, Screen: OverviewScreen, needsModel: true },
+  // Trends reads the local archive — it works before any files are dropped.
+  { key: "trends", label: "Trends", icon: LineChart, Screen: TrendsScreen, needsModel: false },
   { key: "ratecards", label: "Rate Cards", icon: BadgeDollarSign, Screen: RateCardsScreen, needsModel: true },
   { key: "reconcile", label: "Reconcile", icon: Scale, Screen: ReconcileScreen, needsModel: true },
   { key: "invoices", label: "Invoices", icon: FileText, Screen: InvoicesScreen, needsModel: true },

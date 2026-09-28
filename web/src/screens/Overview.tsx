@@ -9,7 +9,8 @@
  * All figures come straight off the CloseModel; HELD lines are excluded from
  * every total and surfaced separately — never rendered as zero-dollar rows.
  */
-import { CircleAlert, Scale } from "lucide-react";
+import { useState } from "react";
+import { Archive, CircleAlert, Scale } from "lucide-react";
 import { Money, sum } from "@pipeline/lib/money.js";
 import type { CloseModel, PartnerDraft } from "@pipeline/domain/types.js";
 import { useClose } from "@/lib/closeStore";
@@ -152,9 +153,17 @@ function aggregate(model: CloseModel): Aggregates {
 }
 
 export function OverviewScreen({ onNavigate }: ScreenProps) {
-  const { model, period } = useClose();
+  const { model, period, archivePromptDue, saveCurrentToArchive } = useClose();
+  // Archive save feedback + banner dismissal (session-local; the store owns the flag).
+  const [savedPeriod, setSavedPeriod] = useState<string | null>(null);
+  const [promptDismissed, setPromptDismissed] = useState(false);
   if (model === null) return null; // App gates on the model; belt-and-suspenders.
   const a = aggregate(model);
+
+  const handleSaveToArchive = () => {
+    const res = saveCurrentToArchive();
+    if (res.ok) setSavedPeriod(res.period ?? null);
+  };
   const marginNegative = a.margin.isNegative();
   const creditExpected = model.totalCreditExpected;
   // Cost-basis flag rides in the label (spec mockup: "Our cost (actual)").
@@ -167,13 +176,52 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="fade-up space-y-2">
-        <h1 className="figure rule-brass text-2xl">Overview</h1>
-        <p className="pt-1 text-sm text-muted-foreground">
-          {period} at a glance — every figure below traces to the draft invoices; held lines are
-          excluded from totals, never zeroed.
-        </p>
+      <div className="fade-up flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-2">
+          <h1 className="figure rule-brass text-2xl">Overview</h1>
+          <p className="pt-1 text-sm text-muted-foreground">
+            {period} at a glance — every figure below traces to the draft invoices; held lines are
+            excluded from totals, never zeroed.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 pt-1">
+          {savedPeriod !== null && (
+            <span className="text-xs text-success" data-testid="archive-saved-note">
+              archived {savedPeriod} ✓
+            </span>
+          )}
+          <Button variant="outline" data-testid="save-archive" onClick={handleSaveToArchive}>
+            <Archive className="h-4 w-4" />
+            Save to archive
+          </Button>
+        </div>
       </div>
+
+      {/* Archive nudge — every draft approved but this close isn't archived yet.
+          Prompt only; saving is always the user's click (spec §3, no auto-save). */}
+      {archivePromptDue && !promptDismissed && (
+        <div
+          data-testid="archive-prompt"
+          className="fade-up flex flex-wrap items-center justify-between gap-3 rounded-glass border border-primary/30 bg-primary/10 px-4 py-3 shadow-glass backdrop-blur-[10px] [border-top-color:hsl(var(--edge-hi))]"
+        >
+          <div className="flex items-center gap-2.5 text-sm text-foreground">
+            <Archive className="h-4 w-4 shrink-0 text-primary" />
+            <span>All drafts approved — save this close to the archive?</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button data-testid="archive-prompt-save" onClick={handleSaveToArchive}>
+              Save to archive
+            </Button>
+            <Button
+              variant="ghost"
+              data-testid="archive-prompt-dismiss"
+              onClick={() => setPromptDismissed(true)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* KPI strip — 4 glass cards (spec §2). delta/spark arrive with the MoM layer. */}
       <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">

@@ -23,6 +23,12 @@ import {
 import { closeFromRateCard } from "@pipeline/close/rateCardClose.js";
 import { isOk } from "@pipeline/lib/result.js";
 import type { CloseModel, Period } from "@pipeline/domain/types.js";
+import {
+  snapshotFromClose,
+  type CloseSnapshot,
+  type CreditStatus,
+} from "@pipeline/domain/snapshot.js";
+import { CONFIRMED_RATES_REVISION } from "@pipeline/config/confirmedRates.js";
 import { buildRateCardDemo, SYNTHETIC_BANNER } from "@fixtures/synthetic/rateCardDemo.js";
 import {
   fingerprintBytes,
@@ -34,6 +40,15 @@ import {
   type SlotPayload,
   type SlotReport,
 } from "@/lib/loadFiles";
+import {
+  exportArchive,
+  importArchive,
+  listPeriods,
+  loadSnapshot,
+  saveSnapshot,
+  setCreditStatus,
+} from "@/lib/closeArchive";
+import { downloadText } from "@/lib/download";
 
 export { SYNTHETIC_BANNER };
 
@@ -84,6 +99,23 @@ export function findingKey(f: {
   return `${f.kind}|${f.partner}|${f.sku}|${f.sourceRow ?? ""}`;
 }
 
+/** KV marker: ISO timestamp of the last archive export (drives "unexported changes"). */
+export const ARCHIVE_LAST_EXPORT_KEY = "coro-archive:v1:last-export";
+
+/** KV key holding the fingerprints a re-save with DIFFERENT files replaced. */
+export function archiveSupersededKey(period: string): string {
+  return `coro-archive:v1:superseded:${period}`;
+}
+
+function sameFingerprints(
+  a: CloseSnapshot["fingerprints"],
+  b: CloseSnapshot["fingerprints"]
+): boolean {
+  return (
+    a.pricing === b.pricing && a.usage === b.usage && (a.invoice ?? null) === (b.invoice ?? null)
+  );
+}
+
 export interface CloseStore {
   readonly files: Partial<Readonly<Record<SlotKey, LoadedSlot>>>;
   readonly demo: boolean;
@@ -106,6 +138,13 @@ export interface CloseStore {
   /** Bundled month packet, when the deployment carries one. */
   readonly packet: PacketManifest | null;
   readonly packetLoading: boolean;
+  /** Archived close periods (sorted ascending) — the local close archive. */
+  readonly archivePeriods: readonly string[];
+  /**
+   * Every draft is approved but this close (period + file fingerprints) isn't
+   * archived yet — Overview offers the save banner. Never auto-saves (spec §3).
+   */
+  readonly archivePromptDue: boolean;
   ingestFile(slot: SlotKey, file: File): Promise<void>;
   clearSlot(slot: SlotKey): void;
   loadDemo(): void;
@@ -115,6 +154,15 @@ export interface CloseStore {
   approveMany(slugs: readonly string[]): void;
   toggleAck(key: string): void;
   markExported(kind: ExportKind): void;
+  /** Snapshot the current close into the archive (preserves credit-status edits). */
+  saveCurrentToArchive(): { ok: boolean; period?: string };
+  loadArchived(period: string): CloseSnapshot | null;
+  /** Download the whole archive as JSON and stamp the last-export marker. */
+  exportArchiveFile(): void;
+  /** Merge an exported archive file — newest savedAt wins per period. */
+  importArchiveFile(text: string): { imported: number; skipped: number } | { error: string };
+  /** Move an archived credit through expected → memo-received → applied. */
+  setCredit(period: string, slug: string, status: CreditStatus): void;
 }
 
 const Ctx = createContext<CloseStore | null>(null);
@@ -165,6 +213,8 @@ export function CloseProvider({ children }: { children: ReactNode }) {
   const [month, setMonth] = useState<MonthState>(EMPTY_MONTH);
   const [packet, setPacket] = useState<PacketManifest | null>(null);
   const [packetLoading, setPacketLoading] = useState(false);
+  // Bumped after every archive write so archive-derived state recomputes.
+  const [archiveTick, setArchiveTick] = useState(0);
 
   // Discover a bundled month packet, if this deployment carries one.
   useEffect(() => {
@@ -402,15 +452,105 @@ export function CloseProvider({ children }: { children: ReactNode }) {
     return { invoicePeriod: top, lines: topCount };
   }, [files.invoice, period]);
 
+  // ---- Close archive (localStorage-backed; see web/src/lib/closeArchive.ts) ----
+
+  /** Snapshot fingerprints = 12-char prefixes, same discipline as the review key. */
+  const currentFingerprints = useMemo(() => {
+    if (!files.pricing || !files.usage) return null;
+    return {
+      pricing: files.pricing.fingerprint.slice(0, 12),
+      usage: files.usage.fingerprint.slice(0, 12),
+      ...(files.invoice ? { invoice: files.invoice.fingerprint.slice(0, 12) } : {}),
+    };
+  }, [files.pricing, files.usage, files.invoice]);
+
+  const archivePeriods = useMemo(() => {
+    void archiveTick; // re-read after every archive write
+    return listPeriods(localStorage);
+  }, [archiveTick]);
+
+  const saveCurrentToArchive = useCallback((): { ok: boolean; period?: string } => {
+    if (model === null || currentFingerprints === null) return { ok: false };
+    const fresh = snapshotFromClose(
+      model,
+      currentFingerprints,
+      CONFIRMED_RATES_REVISION,
+      new Date().toISOString()
+    );
+    const existing = loadSnapshot(localStorage, fresh.period);
+    if (existing !== null && !sameFingerprints(existing.fingerprints, fresh.fingerprints)) {
+      // Keep the replaced snapshot's fingerprints so Trends can note the supersede.
+      try {
+        localStorage.setItem(archiveSupersededKey(fresh.period), JSON.stringify(existing.fingerprints));
+      } catch {
+        // Best-effort marker; the save below still proceeds.
+      }
+    }
+    // Preserve any credit-status edits made against an earlier save of this period.
+    saveSnapshot(localStorage, {
+      ...fresh,
+      creditStatus: { ...fresh.creditStatus, ...(existing?.creditStatus ?? {}) },
+    });
+    setArchiveTick((t) => t + 1);
+    return { ok: true, period: fresh.period };
+  }, [model, currentFingerprints]);
+
+  const loadArchived = useCallback(
+    (p: string): CloseSnapshot | null => loadSnapshot(localStorage, p),
+    []
+  );
+
+  const exportArchiveFile = useCallback(() => {
+    const tag = listPeriods(localStorage).at(-1) ?? period;
+    downloadText(`coro-close-archive-${tag}.json`, "application/json", exportArchive(localStorage));
+    try {
+      localStorage.setItem(ARCHIVE_LAST_EXPORT_KEY, new Date().toISOString());
+    } catch {
+      // Best-effort marker; the download already happened.
+    }
+    setArchiveTick((t) => t + 1);
+  }, [period]);
+
+  const importArchiveFile = useCallback(
+    (text: string): { imported: number; skipped: number } | { error: string } => {
+      try {
+        const res = importArchive(localStorage, text);
+        setArchiveTick((t) => t + 1);
+        return res;
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+      }
+    },
+    []
+  );
+
+  const setCredit = useCallback((p: string, slug: string, status: CreditStatus) => {
+    setCreditStatus(localStorage, p, slug, status);
+    setArchiveTick((t) => t + 1);
+  }, []);
+
+  // The archive nudge: every draft approved (the checklist's own condition) but
+  // this period+files combination isn't archived yet. Prompt only — never auto-save.
+  const archivePromptDue = useMemo(() => {
+    void archiveTick;
+    if (model === null || currentFingerprints === null) return false;
+    if (!(progress.totalDrafts > 0 && progress.approved === progress.totalDrafts)) return false;
+    const existing = loadSnapshot(localStorage, model.period);
+    return existing === null || !sameFingerprints(existing.fingerprints, currentFingerprints);
+  }, [model, currentFingerprints, progress.totalDrafts, progress.approved, archiveTick]);
+
   const store = useMemo<CloseStore>(
     () => ({
       files, demo, period, model, review: month.review, acked, exported: month.exported,
       progress, invoicePeriodMismatch, errors, packet, packetLoading,
+      archivePeriods, archivePromptDue,
       ingestFile, clearSlot, loadDemo, loadPacket, setReview, approveMany, toggleAck, markExported,
+      saveCurrentToArchive, loadArchived, exportArchiveFile, importArchiveFile, setCredit,
     }),
     [files, demo, period, model, month.review, acked, month.exported, progress,
-      invoicePeriodMismatch, errors, packet, packetLoading,
-      ingestFile, clearSlot, loadDemo, loadPacket, setReview, approveMany, toggleAck, markExported]
+      invoicePeriodMismatch, errors, packet, packetLoading, archivePeriods, archivePromptDue,
+      ingestFile, clearSlot, loadDemo, loadPacket, setReview, approveMany, toggleAck, markExported,
+      saveCurrentToArchive, loadArchived, exportArchiveFile, importArchiveFile, setCredit]
   );
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

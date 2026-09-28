@@ -4,6 +4,7 @@
 export type SectionKey =
   | "intake"
   | "overview"
+  | "trends"
   | "ratecards"
   | "reconcile"
   | "invoices"
