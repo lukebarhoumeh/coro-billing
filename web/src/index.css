@@ -148,12 +148,14 @@ body::before {
 }
 
 /* ------------------------------------------------------------------------- *
- * Print stylesheet — only the invoice document (.print-invoice, rendered by
- * the Invoices screen) is printed. Visibility technique: hide everything,
- * re-show the invoice subtree, and lift it to the top-left of the page. The
- * dark theme is forced to paper colors (white background, near-black text,
- * light borders). Tailwind's own `print:hidden` utilities still apply on top
- * of this — they are display-based and are NOT redefined here.
+ * Print stylesheet — two printable artifacts exist: the customer invoice
+ * (.print-invoice, rendered inline by the Invoices screen) and the internal
+ * report pack (.print-report, an overlay opened from Overview). Visibility
+ * technique: hide everything, re-show the printable subtree, and lift it to
+ * the top-left of the page. The dark theme is forced to paper colors (white
+ * background, near-black text, light borders). Tailwind's own `print:hidden`
+ * utilities still apply on top of this — they are display-based and are NOT
+ * redefined here.
  * ------------------------------------------------------------------------- */
 @media print {
   body::before {
@@ -163,7 +165,9 @@ body::before {
     visibility: hidden;
   }
   .print-invoice,
-  .print-invoice * {
+  .print-invoice *,
+  .print-report,
+  .print-report * {
     visibility: visible;
   }
   .print-invoice {
@@ -174,10 +178,24 @@ body::before {
     border-radius: 0;
     box-shadow: none !important;
   }
-  /* The document is natively paper-styled (navy/gold on white — Luke's
-   * template); print its colors EXACTLY instead of stripping them. */
+  /* The report pack is a fixed overlay on screen; printing lifts it to the
+   * top-left and lets it flow across pages (fixed elements print one page). */
+  .print-report {
+    position: absolute;
+    inset: auto;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto;
+    border-radius: 0;
+    box-shadow: none !important;
+  }
+  /* Both documents are natively paper-styled (navy/gold/slate on white);
+   * print their colors EXACTLY instead of stripping them. */
   .print-invoice,
-  .print-invoice * {
+  .print-invoice *,
+  .print-report,
+  .print-report * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     overflow: visible !important;
@@ -192,7 +210,8 @@ body::before {
   main {
     overflow: visible !important;
   }
-  .print-invoice tr {
+  .print-invoice tr,
+  .print-report tr {
     page-break-inside: avoid;
   }
 }
@@ -225,4 +244,12 @@ body::before {
   outline: 2px solid hsl(var(--primary));
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* ---- Obsidian Glass print reset — white ground, no grain/blobs, and a
+ * .no-print escape hatch for screen-only controls (report pack toolbar). ---- */
+@media print {
+  body { background: #fff !important; }
+  body::before, .ambient-blob { display: none !important; }
+  .no-print { display: none !important; }
 }

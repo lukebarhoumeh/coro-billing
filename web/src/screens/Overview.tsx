@@ -31,6 +31,7 @@ import { GlassPanel } from "@/components/glass/GlassPanel";
 import { KpiCard } from "@/components/glass/KpiCard";
 import { Sparkline } from "@/components/glass/Sparkline";
 import { TrendChip, type TrendTone } from "@/components/glass/TrendChip";
+import { ReportPack } from "@/components/ReportPack";
 import { cn } from "@/lib/cn";
 
 const SEVERITIES = ["block", "warn", "info"] as const;
@@ -215,6 +216,8 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
   // Archive save feedback + banner dismissal (session-local; the store owns the flag).
   const [savedPeriod, setSavedPeriod] = useState<string | null>(null);
   const [promptDismissed, setPromptDismissed] = useState(false);
+  // The print-grade report pack overlay (spec §5); it auto-opens the print dialog.
+  const [reportOpen, setReportOpen] = useState(false);
 
   // MoM layer — the live close snapshotted on the fly vs the archived month
   // right before it. Clock use is fine here (UI layer); savedAt never renders
@@ -300,6 +303,9 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
           <Button variant="outline" data-testid="save-archive" onClick={handleSaveToArchive}>
             <Archive className="h-4 w-4" />
             Save to archive
+          </Button>
+          <Button variant="outline" data-testid="report-pack" onClick={() => setReportOpen(true)}>
+            Report pack ↧
           </Button>
         </div>
       </div>
@@ -625,6 +631,10 @@ export function OverviewScreen({ onNavigate }: ScreenProps) {
           </p>
         </CardContent>
       </Card>
+
+      {/* Report pack — rendered only while open; prints as the report alone
+          via the .print-report carve-out in index.css. */}
+      {reportOpen && <ReportPack onClose={() => setReportOpen(false)} />}
     </div>
   );
 }
