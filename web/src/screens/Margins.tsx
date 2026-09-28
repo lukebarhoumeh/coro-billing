@@ -460,7 +460,7 @@ export function MarginsScreen(props: ScreenProps) {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {/* 1 — heading */}
-      <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+      <div className="fade-up space-y-2">
         <h1 className="figure rule-brass text-2xl">Margins</h1>
         <p className="pt-1 text-sm text-muted-foreground">
           {period} — where the gross profit comes from and every dollar that disagrees. Each
@@ -470,7 +470,7 @@ export function MarginsScreen(props: ScreenProps) {
       </div>
 
       {/* 2 — GP bridge */}
-      <Card className="rise" style={{ "--rise-i": 1 } as React.CSSProperties}>
+      <Card className="fade-up" style={{ animationDelay: "40ms" }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Scale className="h-4 w-4 shrink-0 text-primary" />
@@ -536,7 +536,7 @@ export function MarginsScreen(props: ScreenProps) {
       </Card>
 
       {/* 3 — GM% by partner (ranked) */}
-      <Card className="rise" style={{ "--rise-i": 2 } as React.CSSProperties}>
+      <Card className="fade-up" style={{ animationDelay: "80ms" }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Percent className="h-4 w-4 shrink-0 text-primary" />
@@ -561,7 +561,7 @@ export function MarginsScreen(props: ScreenProps) {
             <span className="microlabel w-28 shrink-0 text-right">GP</span>
             <span className="microlabel w-28 shrink-0 text-right">billed</span>
           </div>
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-edge">
             {gmRows.map((r) => {
               const neg = r.gp.isNegative();
               return (
@@ -569,7 +569,7 @@ export function MarginsScreen(props: ScreenProps) {
                   key={r.slug}
                   data-testid={`gm-row-${r.slug}`}
                   onClick={() => onNavigate("invoices", r.slug)}
-                  className="flex w-full items-center gap-3 px-1 py-2 text-left text-sm transition-colors hover:bg-muted/40"
+                  className="flex w-full items-center gap-3 px-1 py-2 text-left text-sm transition-colors hover:bg-glass-2"
                   title={`Open ${r.cardName}'s draft invoice`}
                 >
                   <span className="w-44 shrink-0 truncate font-medium">{r.cardName}</span>
@@ -626,7 +626,7 @@ export function MarginsScreen(props: ScreenProps) {
       </Card>
 
       {/* 4 — GP by product family */}
-      <Card className="rise" style={{ "--rise-i": 3 } as React.CSSProperties}>
+      <Card className="fade-up" style={{ animationDelay: "120ms" }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Layers className="h-4 w-4 shrink-0 text-primary" />
@@ -638,7 +638,7 @@ export function MarginsScreen(props: ScreenProps) {
             {rollups.map((r) => {
               const neg = r.gp.isNegative();
               return (
-                <div key={r.label} className="rounded-md border border-border/60 bg-muted/20 p-4">
+                <div key={r.label} className="rounded-glass border border-edge bg-glass-1 p-4">
                   <div className="microlabel">{r.label}</div>
                   <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <span
@@ -723,7 +723,7 @@ export function MarginsScreen(props: ScreenProps) {
       </Card>
 
       {/* 5 — Discrepancy impact */}
-      <Card className="rise" style={{ "--rise-i": 4 } as React.CSSProperties}>
+      <Card className="fade-up" style={{ animationDelay: "160ms" }}>
         <CardHeader className="flex flex-wrap items-baseline justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             <TriangleAlert className="h-4 w-4 shrink-0 text-warning" />
@@ -811,7 +811,7 @@ export function MarginsScreen(props: ScreenProps) {
       </Card>
 
       {/* 6 — Loss-makers */}
-      <Card className="rise" style={{ "--rise-i": 5 } as React.CSSProperties}>
+      <Card className="fade-up" style={{ animationDelay: "200ms" }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingDown className="h-4 w-4 shrink-0 text-danger" />
