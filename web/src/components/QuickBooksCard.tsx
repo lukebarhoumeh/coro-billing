@@ -295,7 +295,10 @@ export function QuickBooksCard() {
         {results.length > 0 && (
           <ul className="space-y-1 text-xs">
             {results.map((r) => (
-              <li key={r.slug} className="flex items-center gap-2">
+              <li
+                key={r.slug}
+                className="flex items-center gap-2 rounded-md border border-edge bg-glass-1 px-2.5 py-1.5"
+              >
                 {icon(r.tone)}
                 <span className="font-medium">{r.partner}</span>
                 <span className={r.tone === "warn" ? "text-warning" : "text-muted-foreground"}>

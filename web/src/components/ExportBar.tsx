@@ -76,7 +76,7 @@ export function ExportBar() {
         IIF
       </Button>
       {unapproved.length > 0 && (
-        <span className="text-xs text-muted-foreground">
+        <span className="rounded-full border border-edge bg-glass-3 px-2.5 py-1 text-xs text-muted-foreground">
           {unapproved.length} of {model.partners.length} drafts unapproved — QuickBooks exports are
           gated
         </span>

@@ -60,8 +60,8 @@ function PartnerCard({ draft, status, index, onOpen }: {
       role="button"
       tabIndex={0}
       data-testid={`invoice-card-${draft.slug}`}
-      className="rise cursor-pointer transition-colors hover:border-primary/60 hover:shadow-ledger-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      style={{ "--rise-i": index } as React.CSSProperties}
+      className="fade-up cursor-pointer transition-[transform,box-shadow,border-color] duration-200 ease-glass hover:-translate-y-[3px] hover:border-primary/60 hover:shadow-glass-lift motion-reduce:transition-none motion-reduce:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
       onClick={onOpen}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -110,7 +110,7 @@ function ReviewToolbar({ slug, entry, setReview }: {
 }) {
   const [note, setNote] = useState(entry?.note ?? "");
   return (
-    <Card className="rise print:hidden" style={{ "--rise-i": 1 } as React.CSSProperties}>
+    <Card className="fade-up print:hidden" style={{ animationDelay: "40ms" }}>
       <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-start">
         <div className="flex flex-wrap items-center gap-2">
           <ReviewPill status={entry?.status} />
@@ -140,7 +140,7 @@ function ReviewToolbar({ slug, entry, setReview }: {
           value={note}
           rows={2}
           placeholder="Review note — saved with this month's close…"
-          className="w-full flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full flex-1 rounded-md border border-edge bg-glass-1 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onChange={(e) => setNote(e.target.value)}
           onBlur={() => {
             // Persist the note, keeping the current status (unreviewed defaults
@@ -175,10 +175,7 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, invoiceNo, onBac
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
-      <div
-        className="rise flex flex-wrap items-center justify-between gap-2 print:hidden"
-        style={{ "--rise-i": 0 } as React.CSSProperties}
-      >
+      <div className="fade-up flex flex-wrap items-center justify-between gap-2 print:hidden">
         <Button variant="ghost" data-testid="invoice-back" onClick={onBack}>
           ← All invoices
         </Button>
@@ -213,7 +210,7 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, invoiceNo, onBac
       <ReviewToolbar key={draft.slug} slug={draft.slug} entry={entry} setReview={setReview} />
 
       {/* The invoice document (Luke's template) — the ONLY thing that prints. */}
-      <div className="rise" style={{ "--rise-i": 2 } as React.CSSProperties}>
+      <div className="fade-up" style={{ animationDelay: "80ms" }}>
         <InvoiceDoc
           draft={draft}
           period={period}
@@ -377,7 +374,7 @@ export function InvoicesScreen({ context }: ScreenProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+        <div className="fade-up space-y-2">
           <h1 className="figure rule-brass text-2xl">Draft invoices</h1>
           <p className="pt-1 text-sm text-muted-foreground">
             One draft per MSP partner for {period}. Open each to double-check the lines, approve or
@@ -403,8 +400,8 @@ export function InvoicesScreen({ context }: ScreenProps) {
       </div>
 
       <div
-        className="rise flex flex-wrap items-center gap-1.5"
-        style={{ "--rise-i": 1 } as React.CSSProperties}
+        className="fade-up flex flex-wrap items-center gap-1.5"
+        style={{ animationDelay: "40ms" }}
         role="group"
         aria-label="Filter drafts by review status"
       >
@@ -420,7 +417,7 @@ export function InvoicesScreen({ context }: ScreenProps) {
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active
                   ? "border-primary/40 bg-primary/15 text-primary"
-                  : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
+                  : "border-edge bg-glass-1 text-muted-foreground hover:bg-glass-2 hover:text-foreground"
               )}
             >
               {f.label}
@@ -452,7 +449,7 @@ export function InvoicesScreen({ context }: ScreenProps) {
         </p>
       ) : null}
 
-      <div className="rise" style={{ "--rise-i": 6 } as React.CSSProperties}>
+      <div className="fade-up" style={{ animationDelay: "240ms" }}>
         <QuickBooksCard />
       </div>
     </div>
