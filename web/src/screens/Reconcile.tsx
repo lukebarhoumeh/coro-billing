@@ -98,7 +98,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
 
   return (
     <div className="space-y-6">
-      <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+      <div className="fade-up space-y-2">
         <h1 className="figure rule-brass text-2xl">Reconcile</h1>
         <p className="pt-1 text-sm text-muted-foreground">
           Three-way match: rate card ↔ usage ↔ Coro invoice. Every workspace lands in exactly one
@@ -108,7 +108,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
 
       {/* Summary strip — four microlabel + figure stat tiles */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="rise" style={{ "--rise-i": 1 } as React.CSSProperties}>
+        <Card className="fade-up" style={{ animationDelay: "40ms" }}>
           <CardHeader className="pb-1">
             <CardTitle>Joined partners</CardTitle>
           </CardHeader>
@@ -118,8 +118,8 @@ export function ReconcileScreen({ context }: ScreenProps) {
           </CardContent>
         </Card>
         <Card
-          className={cn("rise", model.usageOnly.length > 0 && "border-warning/40")}
-          style={{ "--rise-i": 2 } as React.CSSProperties}
+          className={cn("fade-up", model.usageOnly.length > 0 && "border-warning/40")}
+          style={{ animationDelay: "80ms" }}
         >
           <CardHeader className="pb-1">
             <CardTitle>Usage only</CardTitle>
@@ -136,7 +136,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
             <div className="mt-1 text-xs text-muted-foreground">no special-pricing block</div>
           </CardContent>
         </Card>
-        <Card className="rise" style={{ "--rise-i": 3 } as React.CSSProperties}>
+        <Card className="fade-up" style={{ animationDelay: "120ms" }}>
           <CardHeader className="pb-1">
             <CardTitle>Card only</CardTitle>
           </CardHeader>
@@ -146,8 +146,8 @@ export function ReconcileScreen({ context }: ScreenProps) {
           </CardContent>
         </Card>
         <Card
-          className={cn("rise", invoiceLoaded && "border-success/40")}
-          style={{ "--rise-i": 4 } as React.CSSProperties}
+          className={cn("fade-up", invoiceLoaded && "border-success/40")}
+          style={{ animationDelay: "160ms" }}
         >
           <CardHeader className="pb-1">
             <CardTitle>Coro invoice</CardTitle>
@@ -172,7 +172,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
       </div>
 
       {/* Main three-way table */}
-      <Card className="rise" style={{ "--rise-i": 5 } as React.CSSProperties}>
+      <Card className="fade-up" style={{ animationDelay: "200ms" }}>
         <CardHeader className="pb-2">
           <CardTitle>Joined partners — quantity match</CardTitle>
         </CardHeader>
@@ -198,7 +198,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
                       <TD className="w-8 pr-0">
                         <button
                           data-testid={`reconcile-expand-${p.slug}`}
-                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-glass-2 hover:text-foreground"
                           aria-expanded={open}
                           title={open ? "Collapse products" : "Expand products"}
                           onClick={() => toggle(p.slug)}
@@ -234,7 +234,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
                       </TD>
                     </TR>
                     {open && (
-                      <TR className="bg-muted/20">
+                      <TR className="bg-glass-1">
                         <TD className="w-8" />
                         <TD colSpan={5} className="pb-3">
                           <Table>
@@ -267,10 +267,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
 
       {/* Usage with no pricing block — these lines are in NO draft. */}
       {model.usageOnly.length > 0 && (
-        <Card
-          className="rise border-warning/40"
-          style={{ "--rise-i": 6 } as React.CSSProperties}
-        >
+        <Card className="fade-up border-warning/40" style={{ animationDelay: "240ms" }}>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-warning">
               <TriangleAlert className="h-4 w-4 shrink-0" />
@@ -296,7 +293,7 @@ export function ReconcileScreen({ context }: ScreenProps) {
 
       {/* Card partners with no usage — quiet, not missing. */}
       {model.cardOnly.length > 0 && (
-        <Card className="rise" style={{ "--rise-i": 7 } as React.CSSProperties}>
+        <Card className="fade-up" style={{ animationDelay: "280ms" }}>
           <CardHeader className="pb-2">
             <CardTitle>On the card, quiet this month</CardTitle>
           </CardHeader>
