@@ -106,14 +106,14 @@ function PartnerCard({
     .join(" · ");
 
   return (
-    <Card className="rise" style={{ "--rise-i": riseIndex } as React.CSSProperties}>
+    <Card className="fade-up" style={{ animationDelay: `${riseIndex * 40}ms` }}>
       <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="font-display text-base font-semibold normal-case tracking-normal text-foreground">
             {card.name}
           </CardTitle>
           {card.workspaceId !== null && (
-            <span className="rounded border border-border/60 bg-muted/60 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+            <span className="rounded-full border border-edge bg-glass-3 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
               {card.workspaceId}
             </span>
           )}
@@ -268,7 +268,7 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
 
   return (
     <div className="space-y-6">
-      <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+      <div className="fade-up space-y-2">
         <h1 className="figure rule-brass text-2xl">Rate cards</h1>
         <p className="pt-1 text-sm text-muted-foreground">
           The full Coro special-pricing card per partner — every product, including ones with no
@@ -277,8 +277,8 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
       </div>
 
       <div
-        className="rise sticky top-0 z-10 -mx-2 flex flex-wrap items-center gap-3 rounded-lg border border-transparent bg-background/95 px-2 py-2 backdrop-blur"
-        style={{ "--rise-i": 1 } as React.CSSProperties}
+        className="fade-up sticky top-0 z-10 -mx-2 flex flex-wrap items-center gap-3 rounded-glass border border-edge bg-background/85 px-2 py-2 shadow-glass backdrop-blur-[12px] [border-top-color:hsl(var(--edge-hi))]"
+        style={{ animationDelay: "40ms" }}
       >
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -288,7 +288,7 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search partners by name or workspace id…"
-            className="w-full rounded-md border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full rounded-md border border-edge bg-glass-1 py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
         <span className="microlabel tabular">
