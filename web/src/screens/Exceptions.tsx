@@ -1,19 +1,21 @@
 /**
- * Exceptions — every finding of the close, grouped by severity (block → warn →
- * info), run as a burn-down list: each row carries an acknowledge checkbox so
- * the accounting team can record that a human saw it (it changes no number).
- * Each row can jump to the screen where the finding is actionable, carrying
- * the partner's workspace slug when the name resolves to a draft. Info
- * findings start collapsed — real months carry 40+.
+ * Exceptions — every finding of the close, grouped by KIND and ordered by
+ * severity (block → warn → info), run as a burn-down list: each row carries an
+ * acknowledge checkbox so the accounting team can record that a human saw it
+ * (it changes no number). Each kind is a collapsible glass panel; info-kind
+ * groups start collapsed — real months carry 40+ info findings. Each row can
+ * jump to the screen where the finding is actionable, carrying the partner's
+ * workspace slug when the name resolves to a draft.
  */
 import { useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronUp, EyeOff } from "lucide-react";
 import type { Exception, ExceptionKind } from "@pipeline/domain/types.js";
 import { useClose, findingKey } from "@/lib/closeStore";
 import type { ScreenProps, SectionKey } from "@/lib/nav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge, severityVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { GlassPanel } from "@/components/glass/GlassPanel";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { cn } from "@/lib/cn";
 
@@ -52,6 +54,8 @@ const SEVERITY_TITLE: Record<Severity, string> = {
   info: "Informational",
 };
 
+const SEVERITY_RANK: Record<Severity, number> = { block: 0, warn: 1, info: 2 };
+
 /** Severity-colored border + numeral tint for the summary stat chips. */
 const SEVERITY_STAT: Record<Severity, string> = {
   block: "border-danger/40 text-danger",
@@ -63,14 +67,43 @@ function SeverityStat({ severity, count }: { severity: Severity; count: number }
   return (
     <div
       className={cn(
-        "flex items-baseline justify-between gap-3 rounded-lg border bg-card px-4 py-3 shadow-ledger",
-        count > 0 ? SEVERITY_STAT[severity] : "border-border text-muted-foreground"
+        "flex items-baseline justify-between gap-3 rounded-glass border bg-glass-1 px-4 py-3 shadow-glass",
+        count > 0 ? SEVERITY_STAT[severity] : "border-edge text-muted-foreground"
       )}
     >
       <span className="microlabel">{SEVERITY_TITLE[severity]}</span>
       <span className="figure text-2xl">{count}</span>
     </div>
   );
+}
+
+/** Findings of one kind, tagged with the group's severity (block > warn > info). */
+interface KindGroup {
+  readonly kind: ExceptionKind;
+  readonly severity: Severity;
+  readonly items: readonly Exception[];
+}
+
+/** Group findings by kind, ordered block → warn → info then kind name. */
+function groupByKind(findings: readonly Exception[]): readonly KindGroup[] {
+  const byKind = new Map<ExceptionKind, Exception[]>();
+  for (const f of findings) {
+    const list = byKind.get(f.kind) ?? [];
+    list.push(f);
+    byKind.set(f.kind, list);
+  }
+  const groups: KindGroup[] = [...byKind.entries()].map(([kind, items]) => ({
+    kind,
+    severity: items.reduce<Severity>(
+      (s, f) => (SEVERITY_RANK[f.severity] < SEVERITY_RANK[s] ? f.severity : s),
+      "info"
+    ),
+    items,
+  }));
+  groups.sort(
+    (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || a.kind.localeCompare(b.kind)
+  );
+  return groups;
 }
 
 function FindingsTable({
@@ -163,35 +196,58 @@ export function ExceptionsScreen({ onNavigate }: ScreenProps) {
   const block = visible(model.findings.filter((f) => f.severity === "block"));
   const warn = visible(model.findings.filter((f) => f.severity === "warn"));
   const info = visible(model.findings.filter((f) => f.severity === "info"));
+  const groups = groupByKind([...block, ...warn, ...info]);
   const slugFor = (partner: string): string | undefined =>
     model.partners.find((p) => p.cardName === partner)?.slug;
 
   return (
     <div className="space-y-6">
-      <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+      <div className="fade-up space-y-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
             <h1 className="figure rule-brass text-2xl">Exceptions</h1>
             <p className="pt-1 text-sm text-muted-foreground">
               {total} finding{total === 1 ? "" : "s"} this close —
-              every anomaly the pipeline recorded, grouped by severity.
+              every anomaly the pipeline recorded, grouped by kind, blockers first.
             </p>
           </div>
-          {total > 0 && (
-            <Button
-              variant="outline"
-              data-testid="toggle-acked"
-              aria-pressed={hideAcked}
-              className={cn(
-                "h-auto px-2.5 py-1.5 text-xs",
-                hideAcked && "border-primary/40 bg-primary/10 text-primary"
-              )}
-              onClick={() => setHideAcked((v) => !v)}
-            >
-              <EyeOff className="h-3.5 w-3.5" />
-              Hide acknowledged
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {info.length > 0 && (
+              <Button
+                variant="ghost"
+                data-testid="toggle-info"
+                className="h-auto px-2 py-1 text-xs"
+                onClick={() => setShowInfo((v) => !v)}
+              >
+                {showInfo ? (
+                  <>
+                    Hide info findings
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </>
+                ) : (
+                  <>
+                    Show {info.length} info findings
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </>
+                )}
+              </Button>
+            )}
+            {total > 0 && (
+              <Button
+                variant="outline"
+                data-testid="toggle-acked"
+                aria-pressed={hideAcked}
+                className={cn(
+                  "h-auto px-2.5 py-1.5 text-xs",
+                  hideAcked && "border-primary/40 bg-primary/10 text-primary"
+                )}
+                onClick={() => setHideAcked((v) => !v)}
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+                Hide acknowledged
+              </Button>
+            )}
+          </div>
         </div>
         {total > 0 && (
           <div className="max-w-sm space-y-1.5 pt-1" data-testid="ack-progress">
@@ -212,20 +268,14 @@ export function ExceptionsScreen({ onNavigate }: ScreenProps) {
       </div>
 
       {/* Severity summary — three stat chips */}
-      <div
-        className="rise grid gap-3 sm:grid-cols-3"
-        style={{ "--rise-i": 1 } as React.CSSProperties}
-      >
+      <div className="fade-up grid gap-3 sm:grid-cols-3" style={{ animationDelay: "40ms" }}>
         <SeverityStat severity="block" count={block.length} />
         <SeverityStat severity="warn" count={warn.length} />
         <SeverityStat severity="info" count={info.length} />
       </div>
 
       {total === 0 && (
-        <Card
-          className="rise border-success/40"
-          style={{ "--rise-i": 2 } as React.CSSProperties}
-        >
+        <Card className="fade-up border-success/40" style={{ animationDelay: "80ms" }}>
           <CardContent className="flex items-center gap-2 p-5 text-sm text-success">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             No findings — a clean close.
@@ -234,10 +284,7 @@ export function ExceptionsScreen({ onNavigate }: ScreenProps) {
       )}
 
       {total > 0 && hideAcked && block.length + warn.length + info.length === 0 && (
-        <Card
-          className="rise border-success/40"
-          style={{ "--rise-i": 2 } as React.CSSProperties}
-        >
+        <Card className="fade-up border-success/40" style={{ animationDelay: "80ms" }}>
           <CardContent className="flex items-center gap-2 p-5 text-sm text-success">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             All {total} finding{total === 1 ? "" : "s"} acknowledged — burn-down complete.
@@ -245,73 +292,38 @@ export function ExceptionsScreen({ onNavigate }: ScreenProps) {
         </Card>
       )}
 
-      {([
-        ["block", block],
-        ["warn", warn],
-      ] as const).map(
-        ([sev, items], i) =>
-          items.length > 0 && (
-            <Card
-              key={sev}
-              className="rise"
-              style={{ "--rise-i": i + 2 } as React.CSSProperties}
-            >
-              <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                <CardTitle>{SEVERITY_TITLE[sev]}</CardTitle>
-                <Badge variant={severityVariant(sev)}>{items.length}</Badge>
-              </CardHeader>
-              <CardContent>
+      {/* One collapsible glass panel per finding kind, block → warn → info.
+          Block/warn groups open by default; info groups follow the bulk toggle
+          (each stays individually collapsible in between). */}
+      {groups.map((g, i) => (
+        <div
+          key={g.kind}
+          className="fade-up"
+          style={{ animationDelay: `${Math.min(i + 2, 12) * 40}ms` }}
+        >
+          <GlassPanel>
+            <details className="group" open={g.severity === "info" ? showInfo : true}>
+              <summary className="flex cursor-pointer select-none list-none flex-wrap items-center gap-2.5 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                <Badge variant={severityVariant(g.severity)}>{g.severity}</Badge>
+                <span className="font-mono text-sm text-foreground">{g.kind}</span>
+                <span className="text-xs text-muted-foreground">
+                  · {g.items.length} finding{g.items.length === 1 ? "" : "s"}
+                </span>
+                <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+              </summary>
+              <div className="border-t border-edge px-4 pb-4 pt-1">
                 <FindingsTable
-                  findings={items}
+                  findings={g.items}
                   onNavigate={onNavigate}
                   slugFor={slugFor}
                   acked={acked}
                   onToggleAck={toggleAck}
                 />
-              </CardContent>
-            </Card>
-          )
-      )}
-
-      {info.length > 0 && (
-        <Card className="rise" style={{ "--rise-i": 4 } as React.CSSProperties}>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-            <div className="flex items-center gap-2">
-              <CardTitle>{SEVERITY_TITLE.info}</CardTitle>
-              <Badge variant={severityVariant("info")}>{info.length}</Badge>
-            </div>
-            <Button
-              variant="ghost"
-              data-testid="toggle-info"
-              className="h-auto px-2 py-1 text-xs"
-              onClick={() => setShowInfo((v) => !v)}
-            >
-              {showInfo ? (
-                <>
-                  Hide info findings
-                  <ChevronUp className="h-3.5 w-3.5" />
-                </>
-              ) : (
-                <>
-                  Show {info.length} info findings
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </>
-              )}
-            </Button>
-          </CardHeader>
-          {showInfo && (
-            <CardContent>
-              <FindingsTable
-                findings={info}
-                onNavigate={onNavigate}
-                slugFor={slugFor}
-                acked={acked}
-                onToggleAck={toggleAck}
-              />
-            </CardContent>
-          )}
-        </Card>
-      )}
+              </div>
+            </details>
+          </GlassPanel>
+        </div>
+      ))}
     </div>
   );
 }
