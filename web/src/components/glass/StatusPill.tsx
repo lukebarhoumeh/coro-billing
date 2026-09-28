@@ -1,7 +1,5 @@
 import { cn } from "@/lib/cn";
-
-/** Inline until Task 7 lands src/domain/snapshot.ts; then swap to that import. */
-type CreditStatus = "expected" | "memo-received" | "applied";
+import type { CreditStatus } from "../../../../src/domain/snapshot.js";
 
 const LABEL: Record<CreditStatus, string> = {
   expected: "expected",
