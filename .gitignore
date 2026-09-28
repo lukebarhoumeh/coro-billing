@@ -35,3 +35,6 @@ data/**/*.pdf
 data/2026-*/
 .vercel
 .env*
+
+# Visual brainstorming sessions (superpowers companion)
+.superpowers/
