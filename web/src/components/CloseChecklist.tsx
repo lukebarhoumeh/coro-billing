@@ -64,14 +64,20 @@ export function CloseChecklist({ onNavigate }: { onNavigate: (s: SectionKey) => 
     },
   ];
 
+  // The step the user is on — first not-yet-done step (glass stepper highlight).
+  const activeIdx = steps.findIndex((s) => s.state !== "done");
+
   return (
-    <div className="mx-3 mb-3 mt-2 rounded-lg border border-border/70 bg-background/40 p-3">
+    <div className="mx-3 mb-3 mt-2 rounded-glass border border-edge bg-glass-1 p-3 [border-top-color:hsl(var(--edge-hi))]">
       <div className="microlabel mb-2">Month-end checklist</div>
       <ol className="space-y-1.5">
         {steps.map((s, i) => (
           <li key={s.label}>
             <button
-              className="group flex w-full items-start gap-2 text-left"
+              className={cn(
+                "group flex w-full items-start gap-2 rounded-[10px] border bg-glass-1 px-2.5 py-2 text-left transition-colors hover:bg-glass-2",
+                i === activeIdx ? "border-primary/30" : "border-edge"
+              )}
               data-testid={`checklist-${i}`}
               onClick={() => onNavigate(s.target)}
             >

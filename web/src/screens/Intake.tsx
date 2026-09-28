@@ -81,11 +81,11 @@ function SlotCard({ spec, index }: { spec: SlotSpec; index: number }) {
   return (
     <Card
       className={cn(
-        "rise",
-        dragOver && "border-primary bg-primary/5 shadow-ledger-lift",
+        "fade-up",
+        dragOver && "border-primary/50 bg-primary/5 shadow-glass-lift",
         loaded && "border-success/40"
       )}
-      style={{ "--rise-i": index } as React.CSSProperties}
+      style={{ animationDelay: `${index * 40}ms` }}
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
@@ -116,11 +116,18 @@ function SlotCard({ spec, index }: { spec: SlotSpec; index: number }) {
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span className="break-all font-medium">{loaded.fileName}</span>
             </div>
-            <div className="text-xs text-muted-foreground">
-              {loaded.report.rowsRead.toLocaleString()} rows read
-              {loaded.report.partners !== undefined && <> · {loaded.report.partners} partners</>}
-              {" · "}
-              <span className="font-mono">{loaded.fingerprint.slice(0, 12)}</span>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="rounded-full border border-edge bg-glass-3 px-2 py-0.5">
+                {loaded.report.rowsRead.toLocaleString()} rows read
+              </span>
+              {loaded.report.partners !== undefined && (
+                <span className="rounded-full border border-edge bg-glass-3 px-2 py-0.5">
+                  {loaded.report.partners} partners
+                </span>
+              )}
+              <span className="rounded-full border border-edge bg-glass-3 px-2 py-0.5 font-mono">
+                {loaded.fingerprint.slice(0, 12)}
+              </span>
             </div>
             {loaded.report.warnings.length > 0 && (
               <ul className="space-y-1 rounded-md border border-warning/30 bg-warning/5 p-2 text-xs text-warning">
@@ -131,7 +138,14 @@ function SlotCard({ spec, index }: { spec: SlotSpec; index: number }) {
             )}
           </div>
         ) : (
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground">
+          <label
+            className={cn(
+              "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-glass border-2 border-dashed p-6 text-center text-sm transition-colors",
+              dragOver
+                ? "border-primary/50 text-foreground"
+                : "border-edge text-muted-foreground hover:border-primary/60 hover:text-foreground"
+            )}
+          >
             <span>
               Drop the file here or <span className="text-primary underline underline-offset-4">browse</span>
             </span>
@@ -165,7 +179,7 @@ export function IntakeScreen({ onNavigate }: ScreenProps) {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="rise space-y-2" style={{ "--rise-i": 0 } as React.CSSProperties}>
+      <div className="fade-up space-y-2">
         <h1 className="figure rule-brass text-2xl">Month intake</h1>
         <p className="pt-1 text-sm text-muted-foreground">
           Drop the month's Coro files. Everything is parsed in your browser —{" "}
@@ -178,8 +192,8 @@ export function IntakeScreen({ onNavigate }: ScreenProps) {
 
       {packet !== null && (
         <Card
-          className="rise border-primary/40 bg-primary/5"
-          style={{ "--rise-i": 1 } as React.CSSProperties}
+          className="fade-up border-primary/40 bg-primary/5"
+          style={{ animationDelay: "40ms" }}
         >
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div className="flex items-center gap-3 text-sm">
@@ -206,7 +220,7 @@ export function IntakeScreen({ onNavigate }: ScreenProps) {
       </div>
 
       {model !== null ? (
-        <Card className="rise border-success/40" style={{ "--rise-i": 5 } as React.CSSProperties}>
+        <Card className="fade-up border-success/40" style={{ animationDelay: "200ms" }}>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div className="text-sm">
               <span className="font-medium text-success">Close ready</span>
@@ -222,7 +236,7 @@ export function IntakeScreen({ onNavigate }: ScreenProps) {
           </CardContent>
         </Card>
       ) : (
-        <Card className="rise" style={{ "--rise-i": 5 } as React.CSSProperties}>
+        <Card className="fade-up" style={{ animationDelay: "200ms" }}>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
             <p className="text-sm text-muted-foreground">
               No files yet? Walk the whole workflow on loudly-labeled synthetic data.
