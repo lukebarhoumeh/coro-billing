@@ -29,6 +29,7 @@ import { reduceUsage } from "../ingest/usageReduce.js";
 import { resolvePricingRow } from "../config/productMap.js";
 import { validateListPrices } from "../ingest/specialPricing.js";
 import { PARTNER_SLUG_MAP, stripWorkspaceSuffix } from "../config/partners.js";
+import { resolveConfirmedRate } from "../config/confirmedRates.js";
 import { classifyInvoiceSku } from "./invoiceClose.js";
 import type {
   CloseModel,
@@ -237,7 +238,24 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       }
 
       const billable = match.kind !== "nfr" && match.kind !== "none";
-      const unitL = billable ? (row?.netMsp ?? null) : null;
+      // The accounting team's QB invoices are the pricing authority (Luke,
+      // 2026-09-28): a curated confirmed rate overrides the card's col E,
+      // visibly. It corrects a PRICE only — an unresolved product code
+      // (match "none") still holds; the override never invents a product.
+      const sheetL = billable ? (row?.netMsp ?? null) : null;
+      const confirmed = billable ? resolveConfirmedRate(card.name, g.vendorSku) : null;
+      const unitL = confirmed !== null ? confirmed.rate : sheetL;
+      if (confirmed !== null && (sheetL === null || sheetL.toCents() !== confirmed.rate.toCents())) {
+        flist.push(
+          exception("RATE_OVERRIDE_APPLIED", "info", card.name, g.vendorSku, period,
+            (sheetL === null
+              ? `card has no Net Price to MSP (col E)`
+              : `card col E says ${sheetL.toFixed2()}/unit`) +
+              ` — drafting the accounting-confirmed rate ${confirmed.rate.toFixed2()} ` +
+              `(${confirmed.source})`,
+            row?.sourceRow)
+        );
+      }
       if (billable && unitL === null) {
         flist.push(
           exception("MISSING_RATE", "block", card.name, g.vendorSku, period,
@@ -343,8 +361,8 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
           flist.push(
             exception("CLIENT_PRICE_DIFFERS", "warn", card.name, g.vendorSku, period,
               `the team's workbook bills this at ${teamClientPrice.toFixed2()}/unit but the ` +
-                `rate card (col E) says ${unitL.toFixed2()} — drafting the card rate; ` +
-                `if the workbook price is the negotiated one, the card needs updating`)
+                `drafted rate is ${unitL.toFixed2()} — drafting stands; ` +
+                `if the workbook price is the negotiated one, the rate needs updating`)
           );
         }
       }
@@ -416,7 +434,7 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
               hubCost: costUnit,
               mspPrice: unitL,
               discountPct: row.totalDiscountPct ?? undefined,
-              source: "special-pricing CSV",
+              source: confirmed !== null ? `confirmed rate (${confirmed.source})` : "special-pricing CSV",
               raw: {},
             },
             exceptions: flist,

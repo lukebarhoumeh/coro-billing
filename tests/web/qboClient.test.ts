@@ -17,6 +17,7 @@ import {
   type KV,
   type QboConnection,
 } from "../../web/src/lib/qbo.js";
+import { CONFIRMED_RATES_REVISION } from "../../src/config/confirmedRates.js";
 
 function memoryKV(): KV & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -219,9 +220,9 @@ describe("pushInvoice", () => {
 });
 
 describe("pushed-state", () => {
-  it("keys by period + first-12 fingerprint chars, same discipline as reviewStorageKey", () => {
+  it("keys by period + first-12 fingerprint chars + revision, same discipline as reviewStorageKey", () => {
     expect(qboPushedStorageKey("2026-08", "a".repeat(64), "b".repeat(64))).toBe(
-      `qbo-pushed:2026-08:${"a".repeat(12)}:${"b".repeat(12)}`
+      `qbo-pushed:2026-08:${"a".repeat(12)}:${"b".repeat(12)}:r${CONFIRMED_RATES_REVISION}`
     );
   });
 

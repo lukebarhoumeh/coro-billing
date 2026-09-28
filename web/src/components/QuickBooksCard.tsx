@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CircleCheck, CircleX, Link2, Loader2, Send, TriangleAlert } from "lucide-react";
+import { qbCustomerName } from "../../../src/config/partners.js";
 import { useClose } from "@/lib/closeStore";
 import {
   ReconnectRequired,
@@ -142,10 +143,13 @@ export function QuickBooksCard() {
       }
       const totalCents = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100);
       try {
+        // Push under the accounting team's exact QB customer DisplayName —
+        // QBO matches/creates customers by name; the card name would duplicate
+        // hers (e.g. our "Teledata Cloud Services" is her "TDI Technologies, Inc.").
         const r = await pushInvoice(
           localStorage,
           conn,
-          { partner: p.cardName, docNumber, lines },
+          { partner: qbCustomerName(p.cardName), docNumber, lines },
           Date.now()
         );
         if (pushGeneration.current !== gen) return; // stale loop — the close identity changed

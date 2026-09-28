@@ -49,6 +49,38 @@ export const PARTNER_SLUG_MAP: Readonly<Record<string, string>> = {
   xtbsolutionscom: "XTB Solutions",
 };
 
+/**
+ * Card name → the accounting team's exact QuickBooks customer DisplayName,
+ * taken verbatim from her QB P&L Detail export (2026-09-28). The QBO push
+ * matches/creates customers BY NAME — pushing an unmapped spelling would
+ * duplicate her customer list (our "Teledata Cloud Services" is her
+ * "TDI Technologies, Inc."; punctuation and suffixes differ on most others).
+ * Keys are card names lowercased. Partners she has never billed (Hurricane IT)
+ * are intentionally absent — they fall through to the card name.
+ */
+export const QB_CUSTOMER_NAME: Readonly<Record<string, string>> = {
+  amplivity: "Amplivity",
+  avox: "AVOX LLC",
+  "bene international": "BeNe International",
+  "cyber construction": "Cyber Construction, Inc.",
+  "evolve technologies": "Evolve Technologies, LLC.",
+  "goa-tech": "GOA-Tech",
+  "ideal tech help": "Ideal Tech Help",
+  "it network solutions": "IT Network Solutions Group, LLC.",
+  "meeting tree computer": "Meeting Tree Computer",
+  "net-tech": "Net-Tech",
+  rocker: "Rocker LLC",
+  "techlead professional services llc": "Techlead Professional Services, LLC.",
+  "teledata cloud services": "TDI Technologies, Inc.",
+  "vienerx consulting": "VienerX",
+  "xtb solutions": "XTB Solutions, LLC.",
+};
+
+/** The QB customer DisplayName for a partner card name (identity when unmapped). */
+export function qbCustomerName(cardName: string): string {
+  return QB_CUSTOMER_NAME[cardName.trim().toLowerCase()] ?? cardName;
+}
+
 /** Canonical invoice names, for recognizing an already-canonical input. */
 const CANONICAL_NAMES = new Map<string, string>(
   Object.values(PARTNER_SLUG_MAP).map((name) => [name.toLowerCase(), name])

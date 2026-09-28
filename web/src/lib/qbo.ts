@@ -9,6 +9,7 @@
  *   2. "Connected" means the ~100-day refresh token is alive, not the ~1-hour
  *      access token (v1 conflated the two and disconnected hourly).
  */
+import { CONFIRMED_RATES_REVISION } from "../../../src/config/confirmedRates.js";
 
 export interface KV {
   getItem(key: string): string | null;
@@ -218,7 +219,7 @@ export interface PushedRecord {
 export type PushedState = Readonly<Record<string, PushedRecord>>;
 
 export function qboPushedStorageKey(period: string, pricingFp: string, usageFp: string): string {
-  return `qbo-pushed:${period}:${pricingFp.slice(0, 12)}:${usageFp.slice(0, 12)}`;
+  return `qbo-pushed:${period}:${pricingFp.slice(0, 12)}:${usageFp.slice(0, 12)}:r${CONFIRMED_RATES_REVISION}`;
 }
 
 export function loadPushed(store: KV, key: string): PushedState {

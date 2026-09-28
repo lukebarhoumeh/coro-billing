@@ -237,26 +237,17 @@ function main(): void {
     `${CORO_INVOICE_XLSX.split("\\").pop()}; ledger ${String(LEDGER_XLSX).split("\\").pop()}.`);
   md.push("");
 
-  // --- validation: headless rerun must equal what she saw on screen ---
-  md.push("## Rerun validation (close totals vs her August screenshot)");
-  md.push("");
-  md.push("| Partner | close totalL | screenshot | ok |");
-  md.push("|---|---:|---:|:--:|");
-  let allOk = true;
+  // Historical note: on 2026-09-28 the PRE-override close was validated
+  // against her prod-v2 August screenshot — all 16 partners tied at
+  // $13,778.40 exactly. The accounting-confirmed rates (confirmedRates.ts)
+  // were then adopted, deliberately moving drafted totals; SCREENSHOT_AUG
+  // below is kept as that historical reference, not asserted.
+  void SCREENSHOT_AUG;
   const closeByName = new Map(close.partners.map((p) => [normName(p.cardName), p]));
-  for (const [k, v] of Object.entries(SCREENSHOT_AUG)) {
-    const p = closeByName.get(normName(k));
-    const got = p ? p.totalL.toNumber() : NaN;
-    const ok = Math.abs(got - v) < 0.005;
-    if (!ok) allOk = false;
-    md.push(`| ${p?.cardName ?? k} | ${Number.isFinite(got) ? money(got) : "—"} | ${money(v)} | ${ok ? "✓" : "✗"} |`);
-  }
   const closeTotal = close.partners.reduce((s, p) => s.add(p.totalL), Money.zero());
+  md.push(`Close grand total **$${closeTotal.toFixed2()}** (post confirmed-rates adoption; ` +
+    `pre-adoption run tied her 2026-09-28 screenshot at $13,778.40 on all 16 partners).`);
   md.push("");
-  md.push(`Close grand total **$${closeTotal.toFixed2()}** — screenshot **$13,778.40** — ` +
-    (Math.abs(closeTotal.toNumber() - 13778.4) < 0.005 ? "match ✓" : "MISMATCH ✗"));
-  md.push("");
-  if (!allOk) md.push("**WARNING: rerun differs from her screenshot — treat diffs below with care.**\n");
 
   // --- her August invoice lines, grouped partner → product ---
   const herAug = ledger.filter((l) => l.txnType === "Invoice" && monthOf(l) === "2026-08");

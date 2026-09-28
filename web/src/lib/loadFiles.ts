@@ -15,6 +15,7 @@
 import { parseSpecialPricing } from "../../../src/ingest/specialPricing.js";
 import { parseUsage } from "../../../src/ingest/usage.js";
 import { parseCoroInvoice } from "../../../src/ingest/coroInvoice.js";
+import { CONFIRMED_RATES_REVISION } from "../../../src/config/confirmedRates.js";
 import { isOk, type Result, ok, err } from "../../../src/lib/result.js";
 import type {
   CoroInvoiceLine,
@@ -139,7 +140,12 @@ export function parseSlotBytes(
   }
 }
 
-/** localStorage key for a month's review state — period + both required fingerprints. */
+/**
+ * localStorage key for a month's review state — period + both required
+ * fingerprints + the confirmed-rates revision. The revision matters: confirmed
+ * rates change drafted totals with the SAME input files, and approvals given
+ * against the old numbers must not attach to the new ones.
+ */
 export function reviewStorageKey(period: Period, pricingFp: string, usageFp: string): string {
-  return `coro-close-review:${period}:${pricingFp.slice(0, 12)}:${usageFp.slice(0, 12)}`;
+  return `coro-close-review:${period}:${pricingFp.slice(0, 12)}:${usageFp.slice(0, 12)}:r${CONFIRMED_RATES_REVISION}`;
 }

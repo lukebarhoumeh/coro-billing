@@ -397,7 +397,10 @@ describe("closeFromRateCard — Classic-family forced cost (Coro 2026-09-22 answ
       period: "2026-08",
     });
     const line = model.partners[0]!.lines[0]!;
-    expect(line.unitL!.toFixed2()).toBe("10.20");
+    // Since 2026-09-28 the accounting-confirmed rate (QB inv 10597: 9.35)
+    // overrides Cyber Construction's col E 10.20 — visibly.
+    expect(line.unitL!.toFixed2()).toBe("9.35");
+    expect(line.findings.filter((x) => x.kind === "RATE_OVERRIDE_APPLIED")).toHaveLength(1);
     expect(line.expectedHAdditive!.toFixed2()).toBe("9.34");
     expect(line.findings.filter((x) => x.kind === "CLASSIC_RATE_RULE_DISAGREES")).toHaveLength(0);
   });
@@ -529,5 +532,77 @@ describe("closeFromRateCard — customer breakdown, rated lines, determinism", (
       period: "2026-08",
     };
     expect(closeFromRateCard(args)).toEqual(closeFromRateCard(args));
+  });
+});
+
+describe("closeFromRateCard — accounting-confirmed rates (config/confirmedRates.ts, 2026-09-28)", () => {
+  // Lita's QB invoices are the pricing authority: a curated (partner, SKU)
+  // entry overrides the card's col E and announces itself as a finding.
+  it("drafts XTB Essentials at the confirmed 6.00 over the card's stale 3.75", () => {
+    const xtb = pp("XTB Solutions", "xtbsolutionscom_aaaa_b", [
+      prow("Essentials Flex", { list: "7.50", e: "3.75", f: 40, g: 5, h: "3.56", i: 45 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(xtb),
+      usage: [ul("xtbsolutionscom_AAAA_b", null, "BUCOROflex", 39)],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.unitL!.toFixed2()).toBe("6.00"); // QB inv 10598: 39×6.00
+    expect(line.amountL!.toFixed2()).toBe("234.00");
+    const f = line.findings.filter((x) => x.kind === "RATE_OVERRIDE_APPLIED");
+    expect(f).toHaveLength(1);
+    expect(f[0]!.severity).toBe("info");
+    expect(f[0]!.message).toMatch(/3\.75/); // sheet value stays visible
+    expect(f[0]!.message).toMatch(/6\.00/);
+    expect(f[0]!.message).toMatch(/10598/); // provenance
+  });
+
+  it("leaves an unlisted partner×SKU on the card rate with no finding", () => {
+    // Seven Star has no confirmed-rate entries — the card rules, silently.
+    const model = closeFromRateCard({
+      pricing: pricing(SEVEN_STAR),
+      usage: [ul("sevenstarsystemscom_X8E3_b", null, "COR-COMP-C", 10)],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.unitL!.toFixed2()).toBe("6.40");
+    expect(line.findings.filter((x) => x.kind === "RATE_OVERRIDE_APPLIED")).toHaveLength(0);
+  });
+
+  it("never rescues an unknown product code — the override corrects a price, not a product", () => {
+    // Rocker has confirmed legacy rates, but a code that resolves to no card
+    // row still HOLDS (UNKNOWN_PRODUCT_CODE) — nothing invented.
+    const rocker = pp("Rocker", "rockerio_aaaa_b", [
+      prow("Coro AI Complete", { list: "15.00", e: "6.40", f: 58, g: 5, h: "6.08", i: 61 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(rocker),
+      usage: [ul("rockerio_AAAA_b", null, "TOTALLY-UNKNOWN-SKU", 5)],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.unitL).toBeNull();
+    expect(line.findings.filter((x) => x.kind === "UNKNOWN_PRODUCT_CODE")).toHaveLength(1);
+  });
+
+  it("prices a resolved row that has no col E from the confirmed rate instead of holding", () => {
+    // Evolve's card has no Managed Complete pricing keyed — the confirmed
+    // 14.50 (QB inv 10600) prices it; without the entry this line held.
+    const evolve = pp("Evolve Technologies", "evolvewithuscom_aaaa_b", [
+      prow("Complete Managed Flex", { list: "20.00", e: null, f: 40, g: 5, h: null, i: 45 }),
+    ]);
+    const model = closeFromRateCard({
+      pricing: pricing(evolve),
+      usage: [ul("evolvewithuscom_AAAA_b", null, "BUCOMMNGflex", 16)],
+      period: "2026-08",
+    });
+    const line = model.partners[0]!.lines[0]!;
+    expect(line.unitL!.toFixed2()).toBe("14.50");
+    expect(line.amountL!.toFixed2()).toBe("232.00");
+    expect(line.findings.filter((x) => x.kind === "MISSING_RATE")).toHaveLength(0);
+    const f = line.findings.filter((x) => x.kind === "RATE_OVERRIDE_APPLIED");
+    expect(f).toHaveLength(1);
+    expect(f[0]!.message).toMatch(/no Net Price to MSP/);
   });
 });

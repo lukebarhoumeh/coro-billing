@@ -230,7 +230,9 @@ export type ExceptionKind =
   // --- Coro 2026-09-22 answers (docs/superpowers/specs/2026-09-22-coro-answers-adoption.md) ---
   | "CLASSIC_RATE_RULE_DISAGREES" // card F/G on a Classic-family row ≠ the confirmed 40/5 (answer c)
   | "SHEET_MISLABEL_OVERRIDE" // line priced via a curated sheet-mislabel signature — sheet needs fixing
-  | "CREDIT_EXPECTED"; // Coro invoiced above the confirmed additive cost on a legacy line — credit due (answer c)
+  | "CREDIT_EXPECTED" // Coro invoiced above the confirmed additive cost on a legacy line — credit due (answer c)
+  // --- Accounting-confirmed rates (Lita's QB P&L export, 2026-09-28) ---
+  | "RATE_OVERRIDE_APPLIED"; // drafted the confirmed bill-out rate over the card's col E (config/confirmedRates.ts)
 
 export interface Exception {
   readonly kind: ExceptionKind;

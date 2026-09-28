@@ -1,132 +1,101 @@
 # Call prep — Lita, Sept 29 2026: August reconciliation + QuickBooks integration
 
-Source: Lita's 2026-09-28 email ("Please see the details below… I've also attached the
-QuickBooks transactions") — her QB P&L Detail export (Coro class, July + August) plus
-screenshots of her own July and August runs on the live workbench. Full line-by-line diff:
-`out/lita-reconcile-2026-09-28/REPORT.md`, regenerable via
+Source: Lita's 2026-09-28 email — her QB P&L Detail export (Coro class, July + August)
+plus screenshots of her July and August runs on the live workbench. Full line-by-line
+diff: `out/lita-reconcile-2026-09-28/REPORT.md`, regenerable via
 `pnpm tsx scripts/qbLedgerReconcile.mts`.
 
-## TL;DR
+## TL;DR — the platform now ties her books to the cent
 
-- Her August run on prod v2 reproduced our close exactly: **$13,778.40 / $12,070.82 / GP
-  $1,707.58, 16 drafts** — the headless rerun ties her screenshot on all 16 partners.
-- Against her actual QB invoices, **7 partners tie cent-exact** (TechLead $3,515.00, VienerX
-  $1,811.20, Ideal Tech $1,521.75, BeNe $1,032.00, Meeting Tree $750.00, IT Network $174.50,
-  Hurricane $0) — that's every AI-SKU partner. **All divergence is on legacy Flex SKUs**, and
-  every dollar of it decomposes into a handful of rate-card cells plus one Rocker question.
-- August totals: our close $13,778.40 vs her QB $14,418.11 → Δ $639.71, fully itemized below.
-- "TDI Technologies, Inc." in her books **is** our "Teledata Cloud Services" (identical lines
-  both months). Not a missing partner — a naming difference we must map before any QBO push.
+Luke's direction (2026-09-28): **whatever Lida sends is the truth — her pricing is
+correct.** Done and LIVE ON PROD same day:
 
-## Bucket A — sheet col E is stale/below cost; her rates look right (confirm + we adopt)
+- Her rates were adopted for every diverging line as curated overrides
+  (`src/config/confirmedRates.ts`, 30 lines across 9 partners, each carrying the QB
+  invoice it came from and surfacing a RATE_OVERRIDE_APPLIED finding in the workbench —
+  the sheet's col E stays visible, nothing silent).
+- **August drafted total is now $13,957.76 and matches her QB per partner, per line,
+  Δ $0.00 everywhere — except Rocker (−$460.35), the one genuine open question below.**
+- Margin story improved: 3 of the 4 margin-negative partners (Evolve, TDI/Teledata, XTB)
+  flipped positive at her rates; only TechLead's team-price deal stays cash-negative
+  until Coro's $695 credit memo lands.
+- Her QB customer names are now mapped for the QBO push (our "Teledata Cloud Services" →
+  her "TDI Technologies, Inc.", "Techlead…LLC." punctuation, etc.) so pushing will never
+  duplicate her customer list.
+- Her saved August approvals reset on next visit (review state is keyed on the rates
+  revision) — expected: she re-approves against the corrected numbers.
 
-The pricing CSV's "Net Price to MSP" (col E) is *below Coro's own cost* on three of these.
-Her invoice rates are coherent (cost pass-through or sensible margin). Ask her to confirm
-each is the current agreed rate; then they become card overrides in the workbench.
+Rates adopted (was sheet col E → now her rate): Essentials Flex 6.00 (Avox, Cyber, XTB,
+TDI; was 3.75–5.00, below Coro's own ~4.13 cost in two cases) · Complete Flex 8.90
+(Evolve, XTB, Cyber; was 7.50/9.00) · Evolve Managed Complete 14.50 (card had no rate —
+line used to misprice as plain Complete) · Endpoint Protection 4.12/4.13 · Email
+Protection 4.12 (was 3.00, below cost) · Classic Flex 6.59 (Net-Tech, Cyber, GOA) and
+6.60 (Rocker) · modules 2.50 everywhere · Cyber Managed Classic 9.35 · SAT 1.10 ·
+Rocker legacy Complete 8.25 (encoded so September prices instead of holding).
 
-| SKU family | sheet E (partners) | she bills | Coro cost/unit | Aug impact (ours − hers) |
-|---|---|---|---|---|
-| CORO ESSENTIALS Flex | 5.00 Avox · 4.50 Cyber · 3.75 XTB · 3.75 TDI | **6.00** | ≈4.13 | −193.25 |
-| CORO COMPLETE Flex | 7.50 Evolve · 7.50 XTB | **8.90** | 8.25 | −60.20 |
-| ENDPOINT PROTECTION Flex | 4.00 TDI · 3.50 XTB | **4.12 / 4.13** | 4.125 | −6.33 |
-| EMAIL PROTECTION Flex | 3.00 Net-Tech | **4.12** | 4.125 | −112.00 |
-| MANAGED CORO COMPLETE Flex (Evolve) | *no row — priced as plain Complete 7.50* | **14.50** | 11.00 | −112.00 |
+Note for Danny (separate conversation, not this call): the sheet carried HIGHER rates
+than she bills on Classic (7.20), modules (3.00), SAT (1.40), Cyber Managed Classic
+(10.20) — ~$304/mo if that repricing was intentional. We adopted her rates; repricing
+partners upward is a business decision for later.
 
-(Amplivity Essentials 5.00 and Techlead Essentials 3.00 tie on both sides — genuinely
-per-partner rates, so these are per-card fixes, not one global number.)
+## The call (30 min)
 
-## Bucket B — sheet col E is HIGHER than what she bills (Danny decision: reprice or keep)
-
-Her rates here are essentially cost pass-through (0 margin); the sheet carries a marked-up
-rate. If the sheet is Danny's intended repricing, September invoices go up ~$304/mo across
-these partners; if not, we adopt her rates and tie her books exactly.
-
-| SKU family | sheet E | she bills | Coro cost/unit | Aug impact (ours − hers) |
-|---|---|---|---|---|
-| CORO CLASSIC Flex (Net-Tech 207u, Cyber 41u, GOA 14u) | 7.20 | **6.59** | 6.5945 (flat-45) | +159.82 |
-| Modules Flex, all MOD*/SWG (Net-Tech 232u, Cyber 23u, Amplivity 13u) | 3.00 | **2.50** | 1.40 | +134.00 |
-| MANAGED CORO CLASSIC Flex (Cyber 10u) | 10.20 | **9.35** | 9.345 | +8.50 |
-| SECURITY AWARENESS TRAINING Flex (Evolve 6u) | 1.40 | **1.10** | 1.10 | +1.80 |
-| CORO COMPLETE Flex (Cyber 3u) | 9.00 | **8.90** | 8.25 | +0.30 |
-
-## Bucket C — structural questions for the call
-
-1. **Rocker ($460.35).** Coro's August audit shows Rocker fully on CORO AI Complete (46
-   units — our $294.40 ties her AI line cent-exact) and **contains zero legacy rows**; Coro's
-   August bill to Hub doesn't charge for Rocker legacy either. Her invoice 10601 still bills
-   the legacy stack (Complete Flex 11×8.25 + Classic Flex 56×6.60 = $460.35) on top.
-   Question: did Rocker migrate (→ her invoice double-bills, next month drop the legacy
-   lines) or do those licenses still bill contractually (→ we need them as card lines +
-   flag the audit gap to Coro)? Also Rocker-specific: KY sales tax 6% on their invoice.
-2. **Her August Coro-bill booking.** She booked INVCUS2026-0002193 at **$12,130.10**; the
-   invoice's own subtotal is **$12,998.33**. Her booking is within $59.28 of our
-   additive-rule expected cost ($12,070.82) — did she re-key the bill at corrected rates?
-   Ties directly into the **$1,041.38 credit** we computed Coro owes on legacy lines
-   (docs/CORO_REPLY_2026-09-22.md — still undelivered; Dane-or-drop).
-3. **QBO customer names.** Push matches/creates QB customers by name. Hers vs ours:
-   TDI Technologies, Inc. ≠ Teledata Cloud Services · Net-Tech ≠ Net-Tech Consulting ·
-   VienerX ≠ VienerX Consulting · Techlead Professional Services, LLC. ≠ TechLead
-   Professional Services LLC · IT Network Solutions Group, LLC. ≠ IT Network Solutions ·
-   Cyber Construction, Inc. ≠ Cyber Construction. We need her exact QB display names as a
-   mapping before the first push or we create duplicate customers.
-4. **Invoice extras we don't model yet:** sales tax (Rocker KY 6%) and the Cyber $21.00
-   credit-card fee line. Confirm which partners carry tax/fees so we can encode them.
-5. **Never-push July/August.** Both months are already invoiced manually in her QB. The
-   workbench will only ever push **September forward** (dedup guards our own HUB- numbers,
-   not hers). State this explicitly on the call.
-6. **September go-live sequence** (after rates confirmed): we arm production QuickBooks
-   (keys are granted and ready; connection is deliberately off today) → she connects via
-   the QuickBooks card → we do one sandbox push test together → September close pushes
-   drafts as QB invoices with her approving in the workbench.
-
-## Suggested call agenda (30 min)
-
-1. (5) August walkthrough: 7 partners cent-exact; every delta is legacy-Flex rates.
-2. (10) Rate confirmations — Bucket A one by one ("is 6.00 the current Essentials rate for
-   Avox/Cyber/XTB/TDI?" etc.), then Bucket B ("sheet says 7.20 Classic / 3.00 modules —
-   intended increase, or do we keep your rates?"). Loop Danny on Bucket B if he's not on.
-3. (5) Rocker: migrated or dual-stack? Tax + card-fee list.
-4. (5) Her 0002193 booking + the $1,041.38 Coro credit — what she wants to do.
-5. (5) QBO: name mapping, never-push-July/Aug, September push plan + test.
+1. **(5) Show the tie-out.** Her August line-by-line now matches QB exactly. Ask her to
+   re-run August on the site when convenient — drafts will show her numbers, and the
+   overridden lines each carry an info note naming her invoice as the source.
+2. **(10) Rocker — the one open item ($460.35).** Coro's August audit shows Rocker fully
+   on CORO AI Complete (46 units — ties her AI line to the cent) and has **zero legacy
+   rows**; Coro's August bill to Hub doesn't charge Rocker legacy either. Her invoice
+   10601 still bills the legacy stack (Complete Flex 11×8.25 + Classic 56×6.60).
+   Question: did Rocker migrate (→ drop those lines going forward) or do the legacy
+   licenses still bill contractually (→ we flag the audit gap to Coro; rates are already
+   encoded on our side)? Also Rocker-specific: KY sales tax 6%.
+3. **(5) Invoice extras.** Which partners carry sales tax (Rocker KY — others?) and
+   card fees (Cyber's $21.00 appears on July 10548 but not August 10597 — card-payment
+   conditional?). We'll model both on drafts/pushes once she confirms the rules.
+4. **(5) Her Coro-bill booking + the credit.** She booked INVCUS2026-0002193 at
+   $12,130.10 vs the invoice's $12,998.33 subtotal — within $59.28 of our corrected
+   additive cost ($12,070.82). Compare notes: did she re-key at corrected rates? Ties
+   into the **$1,041.38 credit** we computed Coro owes on legacy lines
+   (docs/CORO_REPLY_2026-09-22.md — undelivered; Dane-or-drop pending).
+5. **(5) QuickBooks go-live plan.** Connection is built, tested, and deliberately OFF on
+   prod today. Sequence: we arm production keys → she connects via the QuickBooks card →
+   one sandbox push test together → September close pushes drafts as QB invoices under
+   her exact customer names, after her approvals. **July and August are never pushed** —
+   they live in QB exactly as she made them; September is the first pushed month.
 
 ## After the call (implementation queue)
 
-- Rate-card overrides for every confirmed rate (Bucket A + B outcomes) + Evolve
-  Managed-Complete row + Rocker resolution.
-- Partner → QB-customer-name map in the push path.
-- Tax + card-fee lines on drafts/pushes where confirmed.
-- Then: arm prod QBO env, sandbox push test, September close.
+- Rocker resolution (drop legacy vs bill it + flag audit gap to Coro).
+- Sales tax + card-fee lines on drafts/pushes per her rules.
+- Arm prod QBO env (keys ready) → sandbox push test → September close.
+- Danny: optional repricing conversation (sheet's higher Classic/modules/SAT rates).
 
 ## Draft reply to Lita (copy-paste; M365 connector is read-only so no Outlook draft)
 
 > Hi Lida,
 >
-> This is exactly what I needed — thank you. I ran your QuickBooks transactions against the
-> platform line by line, and it's in great shape: seven partners tie to the cent (Techlead,
-> VienerX, Ideal Tech, BeNe, Meeting Tree, IT Network Solutions, plus Hurricane at zero),
-> and every remaining difference comes down to a short list of legacy Flex rates I'd like
-> to confirm with you.
+> This is exactly what I needed — thank you. I went through your QuickBooks transactions
+> line by line against the platform, and I've already updated it to your pricing: if you
+> re-run August, every partner now matches your invoices to the cent. Where the Coro
+> pricing sheet disagreed with your rates, your rate is now the one the platform drafts
+> (each of those lines shows a small note naming which of your invoices it came from).
 >
-> Yes to a call tomorrow — what time works for you? Should only take about 30 minutes.
-> What I'd like to cover:
+> Yes to a call tomorrow — what time works? Should only take about 30 minutes:
 >
-> - **Rate confirmations** — the pricing sheet disagrees with your invoices on a few legacy
->   items (Essentials Flex, Complete Flex, Classic Flex, the module add-ons, Endpoint/Email
->   Protection, and Evolve's Managed Complete). Your rates look right on most of them; I
->   just want to lock in the current number for each partner so the platform matches your
->   books exactly going forward.
-> - **Rocker** — Coro's August usage shows them fully on AI Complete (that line ties your
->   invoice to the cent), but their legacy Complete/Classic lines don't appear in the usage
->   or on Coro's bill to us anymore. Want to check whether those still bill or whether they
->   migrated.
-> - **QuickBooks integration** — the connection is built and tested; before we turn it on I
->   want to match our partner names to your exact QB customer names (e.g. your TDI
->   Technologies is our Teledata) so nothing duplicates. And to be clear on process: July
->   and August stay exactly as you invoiced them — the platform will only ever push
->   September forward, after you approve each draft.
-> - Quick question on Coro bill INVCUS2026-0002193 — I noticed it's booked at $12,130.10 vs
->   the invoice's $12,998.33 subtotal, which lines up with the overcharge we found on their
->   legacy lines. Want to compare notes on that credit.
+> - **Rocker** — the one item I couldn't resolve from the files. Coro's August usage
+>   shows them fully on AI Complete (that line ties your invoice 10601 to the cent), but
+>   their legacy Complete/Classic lines no longer appear in Coro's usage or on Coro's
+>   bill to us. Do those still bill contractually, or did Rocker migrate?
+> - **Tax and fees** — which partners get sales tax (I see Rocker's KY 6%) and how you
+>   apply the card fee (it's on Cyber's July invoice but not August), so the platform
+>   can add those lines for you.
+> - Quick question on Coro bill INVCUS2026-0002193 — you booked $12,130.10 vs the
+>   invoice's $12,998.33 subtotal, which lines up almost exactly with the overcharge we
+>   found on their legacy lines. Want to compare notes on that credit.
+> - **QuickBooks** — the integration is ready; I'd like to walk you through how
+>   September will work (you approve drafts, it creates the invoices in QB under your
+>   exact customer names — and July/August stay untouched, exactly as you invoiced them).
 >
 > Send me a couple of times that work and I'll set it up.
 >

@@ -11,6 +11,7 @@ import {
   reviewStorageKey,
 } from "../../web/src/lib/loadFiles.js";
 import { buildRateCardDemo } from "../../fixtures/synthetic/rateCardDemo.js";
+import { CONFIRMED_RATES_REVISION } from "../../src/config/confirmedRates.js";
 import { isOk } from "../../src/lib/result.js";
 
 describe("fingerprintBytes", () => {
@@ -75,9 +76,11 @@ describe("parseSlotBytes", () => {
 });
 
 describe("reviewStorageKey", () => {
-  it("keys on period + truncated fingerprints", () => {
+  it("keys on period + truncated fingerprints + confirmed-rates revision", () => {
+    // The :rN suffix invalidates approvals when confirmedRates.ts changes the
+    // drafted numbers under unchanged input files.
     expect(reviewStorageKey("2026-08", "a".repeat(64), "b".repeat(64))).toBe(
-      `coro-close-review:2026-08:${"a".repeat(12)}:${"b".repeat(12)}`
+      `coro-close-review:2026-08:${"a".repeat(12)}:${"b".repeat(12)}:r${CONFIRMED_RATES_REVISION}`
     );
   });
 });

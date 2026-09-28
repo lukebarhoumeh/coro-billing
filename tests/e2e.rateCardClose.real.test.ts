@@ -5,7 +5,11 @@
  * Every number here was DERIVED from the packet and then pinned: a parser or
  * close regression fails against ground truth, not toys. Re-pinned 2026-09-22
  * after Coro answered the clarification letter and sent the corrected sheet
- * (docs/superpowers/specs/2026-09-22-coro-answers-adoption.md). What the
+ * (docs/superpowers/specs/2026-09-22-coro-answers-adoption.md), and again
+ * 2026-09-28 after the accounting-confirmed rates were adopted from Lita's QB
+ * P&L export (config/confirmedRates.ts; docs/LITA_CALL_PREP_2026-09-29.md) —
+ * drafted L moved 13,778.40 → 13,957.76 and now ties her QB invoices to the
+ * cent on every line except Rocker's audit-absent legacy stack. What the
  * assertions encode now:
  *   - all 16 usage workspaces join the corrected special-pricing CSV;
  *   - ZERO held lines: Net-Tech "BUEmail Flex" and Cyber Construction
@@ -73,21 +77,24 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
     expect(model.cardOnly.map((p) => p.name)).toContain("Seven Star Systems");
   });
 
-  it("foots the month: L $13,778.40, actual H $12,998.33, margin $780.07", () => {
+  it("foots the month: L $13,957.76, actual H $12,998.33, margin $959.43", () => {
     const totalL = model.partners.reduce((s, p) => s + p.totalL.toNumber(), 0);
     const totalHActual = model.partners.reduce((s, p) => s + (p.totalHActual?.toNumber() ?? 0), 0);
     const totalHExpected = model.partners.reduce((s, p) => s + p.totalHExpected.toNumber(), 0);
     const totalMargin = model.partners.reduce((s, p) => s + p.totalMargin.toNumber(), 0);
-    // 13,778.40 = the 2026-09-21 close's 13,376.40 + Net-Tech BUEmail 100×$3.00
-    // + Cyber Construction Managed Coro Classic 10×$10.20 (both formerly HELD).
-    expect(totalL.toFixed(2)).toBe("13778.40");
-    // 12,998.33 = prior 12,492.38 + NT email actual 412.50 + CC classmn 93.45
-    // (held lines never attached their invoice actuals; billable lines do).
+    // 13,957.76 = the 2026-09-22 close's 13,778.40 + 179.36 from the
+    // accounting-confirmed rates (config/confirmedRates.ts, Lita's QB P&L
+    // 2026-09-28): under-billed families up (Essentials 6.00, Complete 8.90,
+    // EP 4.12/4.13, EmailProt 4.12, Evolve MgdComplete 14.50), pass-through
+    // families down (Classic 6.59, modules 2.50, SAT 1.10, CC classmn 9.35).
+    // Ties her QB per partner to the cent except Rocker legacy ($460.35 —
+    // no Rocker legacy rows in Coro's August audit; open call question).
+    expect(totalL.toFixed(2)).toBe("13957.76");
+    // Cost side untouched by bill-out rate adoption:
     expect(totalHActual.toFixed(2)).toBe("12998.33");
     expect(totalHExpected.toFixed(2)).toBe("12070.82");
-    // 780.07 = prior 884.02 − 112.50 (NT email: bill $300 vs Coro's $412.50
-    // until the credit lands) + 8.55 (CC classmn $102.00 − $93.45).
-    expect(totalMargin.toFixed(2)).toBe("780.07");
+    // 959.43 = prior 780.07 + the 179.36 net L increase (costs unchanged).
+    expect(totalMargin.toFixed(2)).toBe("959.43");
   });
 
   it("quantifies the expected Coro credits — $1,041.38 over 5 partners (answer c)", () => {
@@ -122,20 +129,21 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
   });
 
   it("prices Amplivity MODNETWflex from the generic row (Coro renamed 'Network Flex')", () => {
-    // Same $3.00 either way — the 2026-09-22 sheet renamed Amplivity's
-    // "Network Flex" row to "Modules Flex", so the specific-flex chain dangles.
+    // The 2026-09-22 sheet renamed Amplivity's "Network Flex" row to "Modules
+    // Flex" (card says 3.00); she bills modules at 2.50 — confirmed rate wins.
     const amplivity = model.partners.find((p) => p.cardName === "Amplivity")!;
     const mod = amplivity.lines.find((l) => l.vendorSku.toLowerCase() === "modnetwflex")!;
     expect(mod.matchKind).toBe("modules-flex");
     expect(mod.productLabel).toBe("Modules Flex");
-    expect(mod.unitL!.toFixed2()).toBe("3.00");
+    expect(mod.unitL!.toFixed2()).toBe("2.50"); // QB inv 10603
+    expect(mod.findings.some((f) => f.kind === "RATE_OVERRIDE_APPLIED")).toBe(true);
   });
 
-  it("prices Evolve Modsatflex from its 'SAT Flex' row", () => {
+  it("prices Evolve Modsatflex from its 'SAT Flex' row at the confirmed rate", () => {
     const evolve = model.partners.find((p) => p.cardName === "Evolve Technologies")!;
     const sat = evolve.lines.find((l) => l.vendorSku.toLowerCase() === "modsatflex")!;
     expect(sat.matchKind).toBe("sat-flex");
-    expect(sat.unitL!.toFixed2()).toBe("1.40");
+    expect(sat.unitL!.toFixed2()).toBe("1.10"); // QB inv 10600 (card says 1.40)
   });
 
   it("holds NOTHING — the two formerly-held lines now bill from the corrected sheet", () => {
@@ -149,8 +157,8 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
     const netTech = model.partners.find((p) => p.cardName === "Net-Tech")!;
     const email = netTech.lines.find((l) => l.vendorSku.toLowerCase() === "buemailflex")!;
     expect(email.matchKind).toBe("exact"); // new "BUEmail Flex" row
-    expect(email.unitL!.toFixed2()).toBe("3.00");
-    expect(email.amountL!.toFixed2()).toBe("300.00");
+    expect(email.unitL!.toFixed2()).toBe("4.12"); // confirmed (QB inv 10550); card says 3.00
+    expect(email.amountL!.toFixed2()).toBe("412.00");
     // Coro was billing this all along at the flat legacy 7.50×0.55 = 4.125:
     expect(email.actualHAmount!.toFixed2()).toBe("412.50");
     expect(email.creditExpected!.toFixed2()).toBe("150.00"); // 412.50 − 2.625×100
@@ -158,16 +166,16 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
     const cc = model.partners.find((p) => p.cardName === "Cyber Construction")!;
     const classmn = cc.lines.find((l) => l.vendorSku.toLowerCase() === "bucoclassmnflex")!;
     expect(classmn.matchKind).toBe("exact"); // new "Managed Coro Classic" row
-    expect(classmn.unitL!.toFixed2()).toBe("10.20");
+    expect(classmn.unitL!.toFixed2()).toBe("9.35"); // confirmed (QB inv 10597); card says 10.20
     // CC's old "Coro Classic Flex" row is now NAMED "Modules Flex" ($11.99 list)
-    // — priced through the signature-guarded mislabel override, same values:
+    // — priced through the signature-guarded mislabel override:
     const classf = cc.lines.find((l) => l.vendorSku.toLowerCase() === "bucoclassflex")!;
     expect(classf.matchKind).toBe("mislabel-override");
-    expect(classf.unitL!.toFixed2()).toBe("7.20");
+    expect(classf.unitL!.toFixed2()).toBe("6.59"); // confirmed (QB inv 10597); card says 7.20
     // and CC's MOD/ADD lines price from the true modules row, not the mislabel:
     const modline = cc.lines.find((l) => l.vendorSku.toLowerCase() === "modcloudflex")!;
     expect(modline.productLabel).toBe("Coro Module Flex");
-    expect(modline.unitL!.toFixed2()).toBe("3.00");
+    expect(modline.unitL!.toFixed2()).toBe("2.50"); // confirmed modules rate
   });
 
   it("surfaces the real finding histogram — nothing silently resolved", () => {
@@ -188,23 +196,24 @@ describe.skipIf(!hasRealData)("August 2026 rate-card close — real packet", () 
       OUT_OF_PERIOD_LINE: 2, // the two July Rocker lines on invoice 2193
       // EMPTY_PARTNER_BLOCK gone (stray "XTB" row removed), UNKNOWN_PRODUCT_CODE
       // gone (zero held), ASSUMED_MAPPING retired (ADD* = modules, confirmed).
-      // CLIENT_PRICE_DIFFERS 33→35: the two unheld lines join (team keyed
-      // NT email at the 4.12 cost pass-through vs card 3.00; CC classmn 9.35 vs 10.20).
-      CLIENT_PRICE_DIFFERS: 35,
+      // CLIENT_PRICE_DIFFERS 35→5: adopting the accounting-confirmed rates
+      // (2026-09-28) made the drafted rate AGREE with the team's keyed
+      // workbook price on 30 lines — those 30 now carry RATE_OVERRIDE_APPLIED.
+      CLIENT_PRICE_DIFFERS: 5,
+      RATE_OVERRIDE_APPLIED: 30, // config/confirmedRates.ts, Lita's QB P&L 2026-09-28
     });
   });
 
-  it("drafts four margin-negative partners — real business findings", () => {
+  it("drafts ONE margin-negative partner — confirmed rates flipped the other three", () => {
+    // Pre-2026-09-28 this was four (Evolve, TechLead, Teledata, XTB): the
+    // card's stale under-billing rates. At Lita's confirmed rates only
+    // TechLead's team-price deal stays negative on cash (actual) basis —
+    // it flips positive once Coro's $695 credit memo lands.
     const negative = model.partners
       .filter((p) => p.totalMargin.isNegative())
       .map((p) => p.cardName)
       .sort();
-    expect(negative).toEqual([
-      "Evolve Technologies",
-      "TechLead Professional Services LLC",
-      "Teledata Cloud Services",
-      "XTB Solutions",
-    ]);
+    expect(negative).toEqual(["TechLead Professional Services LLC"]);
   });
 
   it("emits 153 rated lines for QuickBooks and is deterministic", () => {
