@@ -14,28 +14,38 @@
  *      signed by its effect on gross profit (positive lifts GP, negative cuts
  *      it), worst first. The detail sentence carries the raw facts.
  *   5. Loss-makers — every line with negative margin, worst first.
+ * Plus, once the local close archive holds a prior month: biggest movers —
+ * top-5 |Δ billed| continuing partners vs that month, NEW partners separately
+ * (the live close snapshotted on the fly, same join as Overview's MoM layer).
  *
  * Held lines never enter billed/cost/GP totals; they appear ONLY in the
  * discrepancy table as unbillable-revenue estimates. All money display goes
  * through money(); GM% through gmPct(); Money.toNumber() is used solely for
  * bar-width arithmetic, never display. Pure SVG/div bars — no chart library.
  */
+import { useMemo } from "react";
 import {
   CheckCircle2,
   Layers,
   Percent,
   Scale,
   TrendingDown,
+  TrendingUp,
   TriangleAlert,
 } from "lucide-react";
 import { Money, sum } from "@pipeline/lib/money.js";
 import type { CloseModel, DraftLine, PartnerDraft } from "@pipeline/domain/types.js";
+import { snapshotFromClose, type CloseSnapshot } from "@pipeline/domain/snapshot.js";
+import { CONFIRMED_RATES_REVISION } from "@pipeline/config/confirmedRates.js";
+import { partnerDeltas } from "@pipeline/close/trends.js";
 import { useClose } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
 import { money, gmPct } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { GlassPanel } from "@/components/glass/GlassPanel";
+import { TrendChip } from "@/components/glass/TrendChip";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { cn } from "@/lib/cn";
 
@@ -354,6 +364,68 @@ function buildLosses(model: CloseModel): readonly LossRow[] {
   return rows;
 }
 
+/* --- Biggest movers vs the prior archived month --------------------------- */
+
+/** Snapshot money string → integer cents (snapshots serialize Money as toFixed2). */
+function centsOf(fixed: string): number {
+  return Math.round(Number(fixed) * 100);
+}
+
+/** "+$1,234.56" / "−$1,234.56" from signed cents — the movers' Δ column. */
+function signedCents(c: number): string {
+  return (
+    (c < 0 ? "−" : "+") +
+    "$" +
+    Math.abs(c / 100).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
+}
+
+interface MoverRow {
+  readonly slug: string;
+  readonly name: string;
+  readonly deltaCents: number;
+  readonly pct: number;
+}
+interface NewPartnerRow {
+  readonly slug: string;
+  readonly name: string;
+  readonly billedCents: number;
+}
+interface Movers {
+  readonly prevPeriod: string;
+  readonly top: readonly MoverRow[];
+  readonly fresh: readonly NewPartnerRow[];
+}
+
+/** Top-5 continuing partners by |Δ billed| + NEW partners, from partnerDeltas.
+ * Partners with $0.00 billed in the prior month have no comparable base and
+ * are omitted (matching partnerDeltas); zero-cent changes aren't movers. */
+function buildMovers(currSnap: CloseSnapshot, prevSnap: CloseSnapshot): Movers {
+  const deltas = partnerDeltas(currSnap, prevSnap);
+  const prevCents = new Map(prevSnap.partners.map((p) => [p.slug, centsOf(p.billedL)]));
+  const changed: MoverRow[] = [];
+  const fresh: NewPartnerRow[] = [];
+  for (const p of currSnap.partners) {
+    const d = deltas.get(p.slug);
+    if (d === undefined) continue;
+    if (d.kind === "new") {
+      fresh.push({ slug: p.slug, name: p.cardName, billedCents: centsOf(p.billedL) });
+      continue;
+    }
+    const deltaCents = centsOf(p.billedL) - (prevCents.get(p.slug) ?? 0);
+    if (deltaCents === 0) continue;
+    changed.push({ slug: p.slug, name: p.cardName, deltaCents, pct: d.pct });
+  }
+  changed.sort(
+    (a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents) || a.slug.localeCompare(b.slug)
+  );
+  fresh.sort((a, b) => b.billedCents - a.billedCents || a.slug.localeCompare(b.slug));
+  return { prevPeriod: prevSnap.period, top: changed.slice(0, 5), fresh };
+}
+
 /* ------------------------------------------------------------------------- *
  * Presentational bits.
  * ------------------------------------------------------------------------- */
@@ -416,7 +488,30 @@ function BridgeRow({
 
 export function MarginsScreen(props: ScreenProps) {
   const { onNavigate } = props;
-  const { model, period } = useClose();
+  const { model, period, files, archivePeriods, loadArchived } = useClose();
+
+  // Biggest movers vs the archived month right before this one — the live
+  // close snapshotted on the fly, exactly Overview's MoM join. Clock use is
+  // UI-layer-only; the snapshot is never persisted from this screen.
+  const movers = useMemo<Movers | null>(() => {
+    if (model === null || files.pricing === undefined || files.usage === undefined) return null;
+    const prevPeriod = archivePeriods.filter((p) => p < period).at(-1) ?? null;
+    const prevSnap = prevPeriod !== null ? loadArchived(prevPeriod) : null;
+    if (prevSnap === null) return null;
+    const fp = {
+      pricing: files.pricing.fingerprint.slice(0, 12),
+      usage: files.usage.fingerprint.slice(0, 12),
+      ...(files.invoice !== undefined ? { invoice: files.invoice.fingerprint.slice(0, 12) } : {}),
+    };
+    const currSnap = snapshotFromClose(
+      model,
+      fp,
+      CONFIRMED_RATES_REVISION,
+      new Date().toISOString()
+    );
+    return buildMovers(currSnap, prevSnap);
+  }, [model, files, archivePeriods, period, loadArchived]);
+
   if (model === null) return null; // App gates on the model; belt-and-suspenders.
 
   const bridge = buildBridge(model);
@@ -468,6 +563,76 @@ export function MarginsScreen(props: ScreenProps) {
           separately below.
         </p>
       </div>
+
+      {/* 1b — Biggest movers vs the prior archived month (needs the archive) */}
+      {movers !== null && (
+        <div className="fade-up" style={{ animationDelay: "20ms" }}>
+          <GlassPanel
+            title={`Biggest movers vs ${movers.prevPeriod}`}
+            hint="Δ billed by partner — top 5 by absolute change"
+            right={<TrendingUp className="h-4 w-4 shrink-0 text-primary" aria-hidden />}
+          >
+            <div className="px-4 pb-4 pt-2" data-testid="margins-movers">
+              {movers.top.length === 0 ? (
+                <p className="py-2 text-sm text-muted-foreground">
+                  No billed changes vs {movers.prevPeriod} among continuing partners.
+                </p>
+              ) : (
+                <div className="divide-y divide-edge">
+                  {movers.top.map((r) => {
+                    const up = r.deltaCents > 0;
+                    return (
+                      <div
+                        key={r.slug}
+                        data-testid={`mover-row-${r.slug}`}
+                        className="flex items-center gap-3 py-2 text-sm"
+                      >
+                        <span className="w-44 shrink-0 truncate font-medium">{r.name}</span>
+                        <TrendChip tone={up ? "up" : "down"}>
+                          {r.pct > 0 ? "+" : r.pct < 0 ? "−" : ""}
+                          {Math.abs(r.pct)}%
+                        </TrendChip>
+                        <span
+                          className={cn(
+                            "ml-auto shrink-0 text-right tabular",
+                            up ? "text-success" : "text-danger"
+                          )}
+                        >
+                          {signedCents(r.deltaCents)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {movers.fresh.length > 0 && (
+                <div className="mt-3 border-t border-edge pt-3">
+                  <div className="microlabel mb-1.5">New this month</div>
+                  <div className="divide-y divide-edge">
+                    {movers.fresh.map((r) => (
+                      <div
+                        key={r.slug}
+                        data-testid={`mover-new-${r.slug}`}
+                        className="flex items-center gap-3 py-2 text-sm"
+                      >
+                        <span className="w-44 shrink-0 truncate font-medium">{r.name}</span>
+                        <TrendChip tone="new" />
+                        <span className="ml-auto shrink-0 text-right tabular text-success">
+                          {signedCents(r.billedCents)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="mt-2 text-[11px] text-muted-foreground/70">
+                Δ billed vs the archived {movers.prevPeriod} close. Partners with $0.00 billed
+                that month have no comparable base and are omitted.
+              </p>
+            </div>
+          </GlassPanel>
+        </div>
+      )}
 
       {/* 2 — GP bridge */}
       <Card className="fade-up" style={{ animationDelay: "40ms" }}>

@@ -18,7 +18,8 @@
  * (buttons + arrow keys) through the CURRENTLY FILTERED order in the detail.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCheck, CheckCircle2, Flag, Printer } from "lucide-react";
+import { CheckCheck, CheckCircle2, ChevronDown, Flag, Printer } from "lucide-react";
+import { Money } from "@pipeline/lib/money.js";
 import type { PartnerDraft, Period } from "@pipeline/domain/types.js";
 import { useClose, type ReviewEntry, type ReviewStatus } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
@@ -30,6 +31,8 @@ import { InvoiceDoc } from "@/components/InvoiceDoc";
 import { QuickBooksCard } from "@/components/QuickBooksCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { GlassPanel } from "@/components/glass/GlassPanel";
+import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 /* ------------------------------------------------------------------------- */
 
@@ -154,7 +157,108 @@ function ReviewToolbar({ slug, entry, setReview }: {
   );
 }
 
-/* ---------------------------- invoice lines ------------------------------ */
+/* ------------------------ end-customer breakdown -------------------------- */
+
+interface CustomerRow {
+  readonly customer: string | null;
+  readonly billed: Money;
+  readonly products: readonly string[];
+}
+
+/**
+ * Per-customer billed share across the partner's PRICED lines: each line's
+ * unitL × the customer's unit share. Held/NFR lines carry no unitL so they
+ * can't enter the split — the same exclusion every billed total applies.
+ * Pure presentation of model data; sorted by billed desc (name tie-break).
+ */
+function buildCustomerRows(draft: PartnerDraft): readonly CustomerRow[] {
+  const acc = new Map<string | null, { billed: Money; products: string[] }>();
+  for (const line of draft.lines) {
+    if (line.unitL === null) continue;
+    for (const share of line.customers) {
+      const cur = acc.get(share.customer) ?? { billed: Money.zero(), products: [] };
+      cur.billed = cur.billed.add(line.unitL.mul(share.quantity));
+      if (!cur.products.includes(line.productLabel)) cur.products.push(line.productLabel);
+      acc.set(share.customer, cur);
+    }
+  }
+  const rows: CustomerRow[] = [...acc.entries()].map(([customer, v]) => ({
+    customer,
+    billed: v.billed,
+    products: v.products,
+  }));
+  rows.sort(
+    (a, b) =>
+      b.billed.toCents() - a.billed.toCents() ||
+      (a.customer ?? "").localeCompare(b.customer ?? "")
+  );
+  return rows;
+}
+
+/** Collapsible "Customers" panel on the draft detail — screen-only, never prints. */
+function CustomersPanel({ draft }: { draft: PartnerDraft }) {
+  const rows = buildCustomerRows(draft);
+  if (rows.length === 0) return null;
+  return (
+    <div className="fade-up print:hidden" style={{ animationDelay: "120ms" }}>
+      <GlassPanel>
+        <details className="group" open data-testid="customers-panel">
+          <summary className="flex cursor-pointer select-none list-none flex-wrap items-center gap-2.5 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <h3 className="font-display text-[15px] text-foreground">Customers</h3>
+            <span className="text-xs text-muted-foreground">
+              · {rows.length} workspace{rows.length === 1 ? "" : "s"} billed this month
+            </span>
+            <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+          </summary>
+          <div className="border-t border-edge px-4 pb-4 pt-1">
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Customer</TH>
+                  <TH>Products</TH>
+                  <TH className="text-right">Billed</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {rows.map((r, i) => (
+                  <TR
+                    key={r.customer ?? "__partner-workspace"}
+                    data-testid={`customer-row-${r.customer ?? "partner-workspace"}`}
+                    className={cn(
+                      "transition-colors hover:bg-glass-2",
+                      i === 0 && "bg-primary/[0.07]"
+                    )}
+                  >
+                    <TD className="whitespace-nowrap">
+                      {r.customer !== null ? (
+                        <span className="font-medium">{r.customer}</span>
+                      ) : (
+                        <span className="text-muted-foreground">(partner workspace)</span>
+                      )}
+                    </TD>
+                    <TD className="text-xs text-muted-foreground">{r.products.join(" · ")}</TD>
+                    <TD
+                      className={cn(
+                        "tabular whitespace-nowrap text-right",
+                        i === 0 && "font-medium text-primary"
+                      )}
+                    >
+                      {money(r.billed)}
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+            <p className="mt-2 text-[11px] text-muted-foreground/70">
+              Billed = card rate × each customer&rsquo;s unit share; held lines (no rate) have
+              nothing to split. Screen-only — the printed invoice never shows this breakdown.
+            </p>
+          </div>
+        </details>
+      </GlassPanel>
+    </div>
+  );
+}
 
 /* ---------------------------- detail view -------------------------------- */
 
@@ -219,6 +323,9 @@ function InvoiceDetail({ draft, entry, setReview, period, demo, invoiceNo, onBac
           demo={demo}
         />
       </div>
+
+      {/* End-customer breakdown — who inside this partner consumed the month. */}
+      <CustomersPanel draft={draft} />
     </div>
   );
 }

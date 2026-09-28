@@ -6,15 +6,30 @@
  * card partners with no usage this month are surfaced separately — nothing
  * silently disappears from the close.
  */
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Receipt, TriangleAlert } from "lucide-react";
 import type { DraftLine, MatchKind } from "@pipeline/domain/types.js";
+import type { CloseSnapshot } from "@pipeline/domain/snapshot.js";
 import { useClose } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { GlassPanel } from "@/components/glass/GlassPanel";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { cn } from "@/lib/cn";
+
+/** "$1,234.56" from signed cents — mirrors the Trends tracker's formatter. */
+function fmtCents(c: number): string {
+  return (
+    (c < 0 ? "−" : "") +
+    "$" +
+    Math.abs(c / 100).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
+}
 
 /** Short display labels for non-exact pricing matches. */
 const MATCH_LABEL: Partial<Record<MatchKind, string>> = {
@@ -82,14 +97,34 @@ function ProductRow({ line }: { line: DraftLine }) {
   );
 }
 
-export function ReconcileScreen({ context }: ScreenProps) {
-  const { model, files } = useClose();
+export function ReconcileScreen({ context, onNavigate }: ScreenProps) {
+  const { model, files, archivePeriods, loadArchived } = useClose();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     context !== undefined ? { [context]: true } : {}
   );
   useEffect(() => {
     if (context !== undefined) setExpanded((e) => ({ ...e, [context]: true }));
   }, [context]);
+
+  // Coro credit summary — a read-only mirror of the Trends tracker's running
+  // balance: Σ expected credits with status ≠ applied, across every archived
+  // month. The canonical tracker (with status edits) lives in Trends.
+  const credits = useMemo(() => {
+    const snaps = archivePeriods
+      .map((p) => loadArchived(p))
+      .filter((s): s is CloseSnapshot => s !== null);
+    let outstandingCents = 0;
+    const partners = new Set<string>();
+    for (const s of snaps) {
+      for (const p of s.partners) {
+        if (p.creditExpected === "0.00") continue;
+        if ((s.creditStatus[p.slug] ?? "expected") === "applied") continue;
+        outstandingCents += Math.round(Number(p.creditExpected) * 100);
+        partners.add(p.slug);
+      }
+    }
+    return { outstandingCents, partnerCount: partners.size };
+  }, [archivePeriods, loadArchived]);
 
   if (model === null) return null;
   const invoiceLoaded = files.invoice !== undefined;
@@ -306,6 +341,33 @@ export function ReconcileScreen({ context }: ScreenProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Coro credit summary — compact and read-only; the tracker's canonical
+          home is Trends (spec §2). */}
+      <div className="fade-up" style={{ animationDelay: "320ms" }}>
+        <GlassPanel>
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+            data-testid="reconcile-credit-summary"
+          >
+            <span className="text-sm text-foreground">
+              Coro credits —{" "}
+              <span className="tabular font-medium text-primary">
+                {fmtCents(credits.outstandingCents)}
+              </span>{" "}
+              outstanding across <span className="tabular">{credits.partnerCount}</span> partner
+              {credits.partnerCount === 1 ? "" : "s"}
+            </span>
+            <Button
+              variant="outline"
+              data-testid="reconcile-credit-trends"
+              onClick={() => onNavigate("trends")}
+            >
+              View in Trends →
+            </Button>
+          </div>
+        </GlassPanel>
+      </div>
     </div>
   );
 }
