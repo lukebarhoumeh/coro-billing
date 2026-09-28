@@ -43,6 +43,16 @@
   --warning-foreground: 30 70% 8%;
   --danger: 356 68% 56%;
   --danger-foreground: 356 40% 97%;
+
+  /* ---- Obsidian Glass (Midnight Ledger v2) ---- */
+  --glass-1: 0 0% 100% / 0.04;   /* panel surface */
+  --glass-2: 0 0% 100% / 0.06;   /* hover / elevated */
+  --glass-3: 0 0% 100% / 0.085;  /* overlay chips */
+  --edge: 0 0% 100% / 0.08;      /* hairline border */
+  --edge-hi: 0 0% 100% / 0.17;   /* top-edge light */
+  --brass-glow: 41 62% 60% / 0.22;
+  --radius-glass: 16px;
+  --ease-glass: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -57,11 +67,11 @@ body,
 
 body {
   margin: 0;
-  background-color: hsl(var(--background));
-  /* Faint radial lamp glow over the ledger — atmosphere without noise. */
+  background-color: #0a0d18; /* no pure black — spec §1 */
   background-image:
-    radial-gradient(1200px 600px at 18% -10%, hsl(41 62% 60% / 0.05), transparent 60%),
-    radial-gradient(900px 500px at 90% 110%, hsl(210 65% 62% / 0.04), transparent 55%);
+    radial-gradient(1100px 550px at 12% -12%, hsl(41 62% 60% / 0.07), transparent 55%),
+    radial-gradient(900px 520px at 96% 108%, hsl(210 65% 62% / 0.06), transparent 55%),
+    linear-gradient(165deg, #0a0d18 0%, #0b101f 50%, #090c16 100%);
   background-attachment: fixed;
   color: hsl(var(--foreground));
   font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
@@ -190,4 +200,29 @@ body::before {
 /* US Letter with comfortable margins. */
 @page {
   margin: 0.75in;
+}
+
+/* ---- Obsidian Glass ambient layer (transform-only; off under reduced motion) ---- */
+.ambient-blob { position: fixed; border-radius: 50%; filter: blur(46px); pointer-events: none; z-index: 0; }
+.ambient-blob--brass { width: 480px; height: 480px; left: -140px; top: -120px;
+  background: hsl(41 62% 60% / 0.10); animation: drift-a 52s var(--ease-glass) infinite alternate; }
+.ambient-blob--ink { width: 420px; height: 420px; right: -120px; bottom: -140px;
+  background: hsl(210 65% 62% / 0.09); animation: drift-b 64s var(--ease-glass) infinite alternate; }
+@keyframes drift-a { to { transform: translate(120px, 90px); } }
+@keyframes drift-b { to { transform: translate(-100px, -80px); } }
+
+/* staggered entrance — apply .fade-up + inline animation-delay (cap: first 12 items) */
+.fade-up { opacity: 0; transform: translateY(10px); animation: fadeup 0.5s var(--ease-glass) forwards; }
+@keyframes fadeup { to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-blob { animation: none; }
+  .fade-up { animation: none; opacity: 1; transform: none; }
+}
+
+/* brass focus rings on every interactive element (spec §1 accessibility) */
+:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: 4px;
 }
