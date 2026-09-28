@@ -4,9 +4,10 @@ import { cn } from "@/lib/cn";
 export type ButtonVariant = "default" | "outline" | "ghost";
 
 const styles: Record<ButtonVariant, string> = {
-  default: "bg-primary text-primary-foreground hover:bg-primary/90",
-  outline: "border border-border bg-transparent hover:bg-muted",
-  ghost: "bg-transparent hover:bg-muted",
+  default:
+    "bg-primary text-primary-foreground shadow-brass-glow transition-[transform,box-shadow] duration-150 ease-glass hover:-translate-y-px hover:bg-primary/90 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+  outline: "border border-edge bg-glass-1 hover:bg-glass-2",
+  ghost: "bg-glass-1 hover:bg-glass-2",
 };
 
 export function Button({

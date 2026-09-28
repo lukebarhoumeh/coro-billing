@@ -8,7 +8,7 @@ const styles: Record<BadgeVariant, string> = {
   success: "bg-success/15 text-success border-success/30",
   warning: "bg-warning/15 text-warning border-warning/30",
   danger: "bg-danger/15 text-danger border-danger/30",
-  muted: "bg-muted text-muted-foreground border-border",
+  muted: "bg-glass-3 text-muted-foreground border-edge",
   info: "bg-accent/15 text-accent border-accent/30",
 };
 

@@ -21,6 +21,7 @@ import {
 import { useClose, SYNTHETIC_BANNER } from "@/lib/closeStore";
 import type { ScreenProps, SectionKey } from "@/lib/nav";
 import { cn } from "@/lib/cn";
+import { AmbientLayer } from "@/components/glass/AmbientLayer";
 import { CloseChecklist } from "@/components/CloseChecklist";
 import { HelpDialog } from "@/components/HelpDialog";
 import { IntakeScreen } from "@/screens/Intake";
@@ -65,7 +66,7 @@ function FileChip({ label, loaded }: { label: string; loaded: string | undefined
         "inline-flex max-w-44 items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-xs",
         loaded
           ? "border-success/40 bg-success/10 text-success"
-          : "border-border bg-muted/40 text-muted-foreground"
+          : "border-edge bg-glass-1 text-muted-foreground backdrop-blur-[10px]"
       )}
       title={loaded ?? `${label} not loaded`}
     >
@@ -99,6 +100,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-full flex-col bg-transparent text-foreground">
+      <AmbientLayer />
       {store.demo && (
         <div className="flex items-center justify-center gap-2 bg-warning px-4 py-1.5 text-center text-xs font-semibold text-warning-foreground">
           <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
@@ -106,9 +108,9 @@ export default function App() {
         </div>
       )}
 
-      <div className="flex flex-1 flex-col lg:flex-row">
+      <div className="relative z-[1] flex flex-1 flex-col lg:flex-row">
         {/* Left rail */}
-        <aside className="shrink-0 border-b border-border bg-card/60 backdrop-blur lg:w-64 lg:border-b-0 lg:border-r">
+        <aside className="m-3 h-fit shrink-0 rounded-glass border border-edge bg-glass-1 shadow-glass backdrop-blur-[18px] [border-top-color:hsl(var(--edge-hi))] lg:sticky lg:top-3 lg:w-64">
           <div className="flex items-center gap-3 px-5 pb-4 pt-6">
             <Mark />
             <div>
@@ -134,10 +136,10 @@ export default function App() {
                   disabled={disabled}
                   onClick={() => onNavigate(s.key)}
                   className={cn(
-                    "flex items-center gap-2.5 whitespace-nowrap rounded-md border-l-2 border-transparent px-3 py-2 text-sm transition-colors",
+                    "flex items-center gap-2.5 whitespace-nowrap rounded-[10px] border border-transparent px-3 py-2 text-sm transition-colors",
                     section === s.key
-                      ? "border-primary bg-primary/10 font-medium text-primary"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                      ? "border-primary/25 bg-gradient-to-r from-primary/15 to-primary/5 font-medium text-primary"
+                      : "text-muted-foreground transition-all duration-200 ease-glass hover:translate-x-[2px] hover:bg-glass-2 hover:text-foreground motion-reduce:transition-none motion-reduce:hover:translate-x-0",
                     disabled && "opacity-40"
                   )}
                 >
