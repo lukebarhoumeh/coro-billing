@@ -481,6 +481,7 @@ export function KpiCard({
         "relative overflow-hidden rounded-glass border border-edge p-4 shadow-glass",
         "backdrop-blur-[14px] transition-[transform,box-shadow] duration-200 ease-glass",
         "hover:-translate-y-[3px] hover:shadow-glass-lift",
+        "motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         "[border-top-color:hsl(var(--edge-hi))]",
         hero
           ? "border-primary/35 bg-gradient-to-br from-primary/15 to-primary/[0.03]"
@@ -503,6 +504,8 @@ export function KpiCard({
   );
 }
 ```
+
+(Review amendment 2026-09-28: `motion-reduce:transition-none motion-reduce:hover:translate-y-0` gates the hover lift — spec section 1 requires EVERY motion-system item disabled under `prefers-reduced-motion`. The same motion-reduce gate rides along wherever a hover translate pattern appears; the Phase 2 mapping table and task steps carry it too.)
 
 - [ ] **Step 5: `Sparkline.tsx`, `AreaChart.tsx`, `WaterfallChart.tsx`, `AmbientLayer.tsx`:**
 
@@ -644,7 +647,7 @@ feat(web): Obsidian Glass primitive kit - GlassPanel, KpiCard, AnimatedNumber, c
 | `bg-card` / `bg-card/60` panel wrappers | `GlassPanel` (or `bg-glass-1 border-edge rounded-glass shadow-glass` where a component swap is too invasive) |
 | `rounded-lg` on surfaces | `rounded-glass` |
 | `shadow-ledger` | `shadow-glass` |
-| `shadow-ledger-lift` / hover states | `hover:-translate-y-[3px] hover:shadow-glass-lift transition-[transform,box-shadow] duration-200 ease-glass` |
+| `shadow-ledger-lift` / hover states | `hover:-translate-y-[3px] hover:shadow-glass-lift transition-[transform,box-shadow] duration-200 ease-glass motion-reduce:transition-none motion-reduce:hover:translate-y-0` |
 | `border-border` on panels | `border-edge [border-top-color:hsl(var(--edge-hi))]` |
 | section `<Card>` from ui/card | keep for forms/dialogs; visual parity comes from Task 4's card.tsx retint |
 | KPI stat blocks | `KpiCard` |
@@ -660,9 +663,9 @@ Tables: rows keep solid/translucent backgrounds (`hover:bg-glass-2`), NO backdro
 
 - [ ] **Step 1:** In `App.tsx` render, add `<AmbientLayer />` as the first child inside the root div (`import { AmbientLayer } from "@/components/glass/AmbientLayer";`), and add `relative z-[1]` to the `flex flex-1` wrapper so content sits above blobs.
 - [ ] **Step 2:** Sidebar `<aside>` (line ~111): replace `border-b border-border bg-card/60 backdrop-blur` with `m-3 h-fit rounded-glass border border-edge bg-glass-1 shadow-glass backdrop-blur-[18px] [border-top-color:hsl(var(--edge-hi))] lg:sticky lg:top-3`. Drop `lg:border-r`/`lg:border-b-0`.
-- [ ] **Step 3:** Nav buttons (line ~136): active state → `rounded-[10px] border border-primary/25 bg-gradient-to-r from-primary/15 to-primary/5 font-medium text-primary` (replace the border-l-2 treatment); inactive hover → `hover:bg-glass-2 hover:translate-x-[2px] transition-all duration-200 ease-glass`.
+- [ ] **Step 3:** Nav buttons (line ~136): active state → `rounded-[10px] border border-primary/25 bg-gradient-to-r from-primary/15 to-primary/5 font-medium text-primary` (replace the border-l-2 treatment); inactive hover → `hover:bg-glass-2 hover:translate-x-[2px] transition-all duration-200 ease-glass motion-reduce:transition-none motion-reduce:hover:translate-x-0`.
 - [ ] **Step 4:** Header (line ~165): keep structure; give the header chips glass style by updating `FileChip`'s base classes: `border-edge bg-glass-1 backdrop-blur-[10px]` for unloaded, keep success tint for loaded.
-- [ ] **Step 5:** `ui/card.tsx`: change the Card base classes from its current `bg-card ...` to `rounded-glass border-edge bg-glass-1 shadow-glass [border-top-color:hsl(var(--edge-hi))]` (read the file; preserve its API and sub-components). `ui/button.tsx`: primary variant gains `shadow-brass-glow hover:-translate-y-px transition-[transform,box-shadow] duration-150 ease-glass`; ghost/outline variants use `border-edge bg-glass-1 hover:bg-glass-2`. `ui/badge.tsx`: outline variant → `border-edge bg-glass-3`.
+- [ ] **Step 5:** `ui/card.tsx`: change the Card base classes from its current `bg-card ...` to `rounded-glass border-edge bg-glass-1 shadow-glass [border-top-color:hsl(var(--edge-hi))]` (read the file; preserve its API and sub-components). `ui/button.tsx`: primary variant gains `shadow-brass-glow hover:-translate-y-px transition-[transform,box-shadow] duration-150 ease-glass motion-reduce:transition-none motion-reduce:hover:translate-y-0`; ghost/outline variants use `border-edge bg-glass-1 hover:bg-glass-2`. `ui/badge.tsx`: outline variant → `border-edge bg-glass-3`.
 - [ ] **Step 6:** Gates: `cd web; pnpm typecheck; pnpm build` clean. Run full suite from root: `pnpm test` → 320+ PASS (component tests don't render, but web module tests must not break).
 - [ ] **Step 7:** Visual check via Playwright MCP: `cd web; pnpm build; pnpm preview` (background), navigate `http://localhost:4173`, load demo data from Intake, screenshot the shell. Compare against `obsidian-hero.html` sidebar/topbar. Kill the preview's child process when done (TaskStop kills the wrapper only, on Windows kill child PIDs).
 - [ ] **Step 8:** Commit
@@ -700,7 +703,7 @@ feat(web): glass re-skin - Intake drop slots, Overview KPI cards and panels
 - Modify: `web/src/screens/RateCards.tsx`, `web/src/screens/Reconcile.tsx`, `web/src/screens/Margins.tsx`
 - Modify: `web/src/screens/Exceptions.tsx` (re-skin AND the one structural change: group findings by `kind`, ordered block→warn→info, each group a collapsible `GlassPanel` — `<details>`/`<summary>` is fine — with `{kind} · {count}` in the summary; keep each finding row's existing rendering inside)
 
-- [ ] **Step 1:** One screen at a time: read fully, apply protocol. Draft invoice cards in Invoices get `hover:-translate-y-[3px] hover:shadow-glass-lift`; the 4-tone push-result rows in QuickBooksCard keep their tone colors on `bg-glass-1` rows. `InvoiceDoc.tsx` (the printable customer invoice) is NOT re-skinned — it's a paper document; leave it.
+- [ ] **Step 1:** One screen at a time: read fully, apply protocol. Draft invoice cards in Invoices get `hover:-translate-y-[3px] hover:shadow-glass-lift motion-reduce:transition-none motion-reduce:hover:translate-y-0`; the 4-tone push-result rows in QuickBooksCard keep their tone colors on `bg-glass-1` rows. `InvoiceDoc.tsx` (the printable customer invoice) is NOT re-skinned — it's a paper document; leave it.
 - [ ] **Step 2:** Gates after EACH screen: web typecheck+build; after all: root `pnpm test` green (Exceptions grouping is presentational; no engine tests touch it).
 - [ ] **Step 3:** Playwright pass over all five screens with the real demo dataset; check the blur budget on Invoices (panels + sidebar ≤6 blurred surfaces — use `flat` on inner panels if over).
 - [ ] **Step 4:** Commit per screen (5 commits), message pattern:

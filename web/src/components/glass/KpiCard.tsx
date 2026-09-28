@@ -16,6 +16,7 @@ export function KpiCard({
         "relative overflow-hidden rounded-glass border border-edge p-4 shadow-glass",
         "backdrop-blur-[14px] transition-[transform,box-shadow] duration-200 ease-glass",
         "hover:-translate-y-[3px] hover:shadow-glass-lift",
+        "motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         "[border-top-color:hsl(var(--edge-hi))]",
         hero
           ? "border-primary/35 bg-gradient-to-br from-primary/15 to-primary/[0.03]"
