@@ -7,22 +7,30 @@
  * rule). Sheet-math and card-level findings surface inline, never hidden.
  * Active partners also carry an indicative GP/GM line read from the close's
  * PartnerDraft (never recomputed here).
+ *
+ * Rate intelligence: rows that usage priced this month (joined to the close's
+ * DraftLines by product label) carry confirmed-override provenance, the unit
+ * margin vs our additive-rule cost, a below-cost alarm, and a month-over-month
+ * rate diff read from the local close archive. All read-only — nothing here
+ * recomputes pricing.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, TriangleAlert } from "lucide-react";
 import { useClose } from "@/lib/closeStore";
 import type { ScreenProps } from "@/lib/nav";
-import { money, gmPct } from "@/lib/format";
+import { money, gmPct, moneyStr } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, severityVariant } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import type {
+  DraftLine,
   Exception,
   ExceptionKind,
   PartnerDraft,
   PricingPartner,
   PricingRow,
 } from "@pipeline/domain/types.js";
+import type { CloseSnapshot } from "@pipeline/domain/snapshot.js";
 import type { Money } from "@pipeline/lib/money.js";
 
 /** Percent cells hold 0-100 numbers (60 ⇒ "60%") — NOT 0..1 fractions. */
@@ -50,6 +58,99 @@ const CARD_KIND_LABEL: Partial<Record<ExceptionKind, string>> = {
   LIST_PRICE_DIVERGES: "list price diverges",
 };
 
+/** One partner block of an archived CloseSnapshot (the prior month's rates). */
+type SnapPartner = CloseSnapshot["partners"][number];
+
+/**
+ * Per-row rate intelligence — the close's DraftLines this pricing row priced
+ * this month (usually one; generic flex rows can carry several usage SKUs).
+ * Confirmed-override provenance, unit margin vs the additive-rule cost, a
+ * below-cost alarm, and the prior archived month's rate when it differs.
+ */
+function RowIntel({
+  lines,
+  prevUnitBySku,
+  prevPeriod,
+}: {
+  lines: readonly DraftLine[];
+  prevUnitBySku: ReadonlyMap<string, string>;
+  prevPeriod: string | null;
+}) {
+  const overrides = lines.flatMap((l) =>
+    l.findings.filter((f) => f.kind === "RATE_OVERRIDE_APPLIED")
+  );
+  // Unique unit margins (unitL − expectedHAdditive) across the row's priced lines.
+  const margins = [
+    ...new Set(
+      lines
+        .filter((l) => l.unitL !== null && l.expectedHAdditive !== null)
+        .map((l) => l.unitL!.sub(l.expectedHAdditive!).toFixed2())
+    ),
+  ];
+  const below = lines.find(
+    (l) =>
+      l.unitL !== null &&
+      l.expectedHAdditive !== null &&
+      l.unitL.toCents() < l.expectedHAdditive.toCents()
+  );
+  // Prior-month rates that differ from this month's draft (slug+sku join).
+  const was = [
+    ...new Set(
+      lines.flatMap((l) => {
+        if (l.unitL === null) return [];
+        const prev = prevUnitBySku.get(l.vendorSku.toLowerCase());
+        return prev !== undefined && prev !== l.unitL.toFixed2() ? [prev] : [];
+      })
+    ),
+  ];
+  if (overrides.length === 0 && margins.length === 0 && below === undefined && was.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      {overrides.length > 0 && (
+        <Badge title={overrides.map((f) => f.message).join("\n")}>
+          confirmed
+          {overrides.length > 1 && ` ×${overrides.length}`}
+        </Badge>
+      )}
+      {margins.map((fixed) => {
+        const neg = fixed.startsWith("-");
+        return (
+          <Badge
+            key={fixed}
+            variant={neg ? "danger" : "success"}
+            className="tabular"
+            title="Unit margin: what the partner pays per unit minus our additive-rule cost"
+          >
+            {neg ? "−" : "+"}
+            {moneyStr(neg ? fixed.slice(1) : fixed)}/unit
+          </Badge>
+        );
+      })}
+      {below !== undefined && (
+        <Badge
+          variant="danger"
+          title={`Partner pays ${below.unitL!.toFixed2()}/unit — below our additive-rule cost ${below.expectedHAdditive!.toFixed2()}`}
+        >
+          <TriangleAlert className="mr-1 h-3 w-3 shrink-0" aria-hidden="true" />
+          below cost
+        </Badge>
+      )}
+      {was.map((prev) => (
+        <Badge
+          key={prev}
+          variant="muted"
+          className="tabular"
+          title={`${prevPeriod ?? "prior month"} billed rate — different this month`}
+        >
+          was {prev}
+        </Badge>
+      ))}
+    </>
+  );
+}
+
 /**
  * "Standard tier" = every row that carries BOTH discounts is 20% MSP + 25% Hub.
  * Requires at least one such row so an all-blank card is not mislabeled.
@@ -67,6 +168,8 @@ function PartnerCard({
   active,
   findings,
   draft,
+  prev,
+  prevPeriod,
   riseIndex,
 }: {
   card: PricingPartner;
@@ -74,6 +177,10 @@ function PartnerCard({
   findings: readonly Exception[];
   /** The close's draft for this partner (slug === workspaceId); null for quiet partners. */
   draft: PartnerDraft | null;
+  /** The same partner in the prior archived month's snapshot; null when absent. */
+  prev: SnapPartner | null;
+  /** The prior archived period ("2026-07"), for MoM chip tooltips. */
+  prevPeriod: string | null;
   /** Staggered entrance index (capped by the caller). */
   riseIndex: number;
 }) {
@@ -100,6 +207,27 @@ function PartnerCard({
     }
     return map;
   }, [findings, card.name]);
+
+  // This month's DraftLines joined to pricing rows by product label — the
+  // label IS the priced row's product for every line usage priced this month.
+  const linesByProduct = useMemo(() => {
+    const map = new Map<string, DraftLine[]>();
+    for (const l of draft?.lines ?? []) {
+      const list = map.get(l.productLabel) ?? [];
+      list.push(l);
+      map.set(l.productLabel, list);
+    }
+    return map;
+  }, [draft]);
+
+  // Prior archived month's unit rates by vendorSku (lowercased) for MoM diffs.
+  const prevUnitBySku = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const l of prev?.lines ?? []) {
+      if (l.unitL !== undefined) map.set(l.vendorSku.toLowerCase(), l.unitL);
+    }
+    return map;
+  }, [prev]);
 
   const contact = [card.contactName, card.contactEmail, card.approxMonthlySpend]
     .filter((v): v is string => v !== null && v.trim() !== "")
@@ -182,6 +310,11 @@ function PartnerCard({
                         </Badge>
                       )}
                       {row.netMsp === null && <Badge variant="danger">no price</Badge>}
+                      <RowIntel
+                        lines={linesByProduct.get(row.product) ?? []}
+                        prevUnitBySku={prevUnitBySku}
+                        prevPeriod={prevPeriod}
+                      />
                     </div>
                   </TD>
                   <TD className="tabular text-right text-muted-foreground">
@@ -213,7 +346,7 @@ function PartnerCard({
 }
 
 export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
-  const { files, model } = useClose();
+  const { files, model, period, archivePeriods, loadArchived } = useClose();
   const [query, setQuery] = useState(context ?? "");
 
   // Navigating here with a partner slug focuses the search on it.
@@ -236,6 +369,33 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
     () => new Map((model?.partners ?? []).map((p) => [p.slug, p])),
     [model]
   );
+
+  // Prior archived month (local close archive) — powers the MoM rate diffs.
+  const prevArchive = useMemo(() => {
+    const prevPeriod = archivePeriods.filter((p) => p < period).at(-1) ?? null;
+    const snap = prevPeriod !== null ? loadArchived(prevPeriod) : null;
+    if (snap === null) return null;
+    return { period: snap.period, bySlug: new Map(snap.partners.map((p) => [p.slug, p])) };
+  }, [archivePeriods, period, loadArchived]);
+
+  // Header intelligence counts, straight off the close model (null pre-close).
+  const intelCounts = useMemo(() => {
+    if (model === null) return null;
+    const confirmed = model.findings.filter((f) => f.kind === "RATE_OVERRIDE_APPLIED").length;
+    let belowCost = 0;
+    for (const p of model.partners) {
+      for (const l of p.lines) {
+        if (
+          l.unitL !== null &&
+          l.expectedHAdditive !== null &&
+          l.unitL.toCents() < l.expectedHAdditive.toCents()
+        ) {
+          belowCost += 1;
+        }
+      }
+    }
+    return { confirmed, belowCost };
+  }, [model]);
 
   const q = query.trim().toLowerCase();
   const filtered = useMemo(() => {
@@ -274,6 +434,22 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
           The full Coro special-pricing card per partner — every product, including ones with no
           usage this month. "Partner pays" is the net price to the MSP (what they pay MSP Hub).
         </p>
+        {intelCounts !== null && (
+          <div
+            className="flex flex-wrap items-center gap-2 pt-1"
+            data-testid="ratecard-intel-counts"
+          >
+            <Badge className="tabular">
+              {intelCounts.confirmed} confirmed override{intelCounts.confirmed === 1 ? "" : "s"}
+            </Badge>
+            <span aria-hidden="true" className="text-xs text-muted-foreground">
+              ·
+            </span>
+            <Badge variant={intelCounts.belowCost > 0 ? "danger" : "muted"} className="tabular">
+              {intelCounts.belowCost} below-cost
+            </Badge>
+          </div>
+        )}
       </div>
 
       <div
@@ -311,6 +487,12 @@ export function RateCardsScreen({ onNavigate, context }: ScreenProps) {
               draft={
                 card.workspaceId !== null ? (draftBySlug.get(card.workspaceId) ?? null) : null
               }
+              prev={
+                card.workspaceId !== null
+                  ? (prevArchive?.bySlug.get(card.workspaceId) ?? null)
+                  : null
+              }
+              prevPeriod={prevArchive?.period ?? null}
               riseIndex={Math.min(i + 2, 8)}
             />
           ))}
