@@ -204,8 +204,8 @@ describe("buildCloseWorkbook", () => {
       customer: null,
       sku: { vendorSku: code, class: "legacy" as const, isLegacy: true },
       quantity: 3,
-      u: { raw: null, known: false },
-      d: { raw: null, known: false },
+      u: { raw: null, known: false as const },
+      d: { raw: null, known: false as const },
       raw: {},
       sourceRow,
     });

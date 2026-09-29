@@ -200,6 +200,56 @@ describe("resolvePricingRow — ADD*, NFR, unknowns", () => {
   });
 });
 
+describe("resolvePricingRow — September 2026 packet (invoice 2512, 2026-09-29 sheet)", () => {
+  it("maps COR-USERD-C to the current-gen 'Coro AI Modules' row (Auditlytics idiom)", () => {
+    // USER_DATA_GOVERNANCE is a single module at the $7.50 modules list —
+    // modules price from the partner's modules row (Coro 2026-09-22 answer).
+    const auditlytics = partner("Auditlytics", [
+      row("Coro AI Essentials", "3.20", "7.50"),
+      row("Coro AI Modules", "1.92", "7.50"),
+    ]);
+    const m = resolvePricingRow(auditlytics, "COR-USERD-C");
+    expect(m.kind).toBe("exact");
+    expect(m.row!.product).toBe("Coro AI Modules");
+    expect(m.row!.netMsp!.toFixed2()).toBe("1.92");
+  });
+
+  it("prefers a card row naming User Data Governance itself, should one appear", () => {
+    const future = partner("Future Sheet", [
+      row("User Data Governance", "2.50", "7.50"),
+      row("Coro AI Modules", "1.92", "7.50"),
+    ]);
+    expect(resolvePricingRow(future, "COR-USERD-C").row!.product).toBe("User Data Governance");
+  });
+
+  it("returns none for COR-USERD-C when the card has no modules row — never invents", () => {
+    const bare = partner("Bare", [row("Coro AI Complete", "12.00")]);
+    expect(resolvePricingRow(bare, "COR-USERD-C").kind).toBe("none");
+  });
+
+  it("maps BUCORMNGflex to a 'Managed Coro Essentials Flex' row (B2B Technologies idiom)", () => {
+    const b2b = partner("B2B Technologies", [
+      row("Essentials Flex", "3.50", "7.50"),
+      row("Managed Coro Essentials Flex", "6.40", "10.50"),
+    ]);
+    const m = resolvePricingRow(b2b, "BUCORMNGflex");
+    expect(m.kind).toBe("exact");
+    expect(m.row!.product).toBe("Managed Coro Essentials Flex");
+  });
+
+  it("BUCORMNGflex never falls back to an unmanaged Essentials row (S-3 holds honestly)", () => {
+    // Invoice 2512 bills S3 94 × MANAGED CORO ESSENTIALS Flex, but S-3's card
+    // carries no managed-essentials rate — pricing it from a plain Essentials
+    // row would understate L by the service fee. The line must hold.
+    const s3 = partner("S-3", [
+      row("Coro AI Essentials", "3.00", "7.50"),
+      row("Modules Flex", "1.92", "7.50"),
+      row("Coro Managed", "2.50", "5.00"),
+    ]);
+    expect(resolvePricingRow(s3, "BUCORMNGflex").kind).toBe("none");
+  });
+});
+
 describe("resolvePricingRow — 2026-09-22 sheet revision (Coro's answers)", () => {
   it("maps BUEMAILflex to the new 'BUEmail Flex' spelling (Net-Tech / 1Wire rename)", () => {
     const nt = partner("Net-Tech", [row("BUEmail Flex", "3.00", "7.50")]);

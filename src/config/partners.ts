@@ -29,20 +29,36 @@ export function stripWorkspaceSuffix(slug: string): string {
 /**
  * Curated slug → invoice-name map (August 2026 packet; extend as partners appear).
  * Keys are post-stripWorkspaceSuffix, lowercased.
+ *
+ * September 2026 packet (invoice INVCUS2026-0002512 + the Sept usage report)
+ * added nine parents. Names are the invoice's spellings — two matter for the
+ * cost cross-check because they differ from the pricing-sheet card name:
+ * s3svccom is carded "S-3" but invoiced "Security Solutions Services dba S3",
+ * and copperbandtechcom is carded "Copperband Technologies, LLC" but invoiced
+ * without the ", LLC".
  */
 export const PARTNER_SLUG_MAP: Readonly<Record<string, string>> = {
+  albanyitcom: "Albany IT",
   amplivitycom: "Amplivity",
+  auditlyticscom: "Auditlytics",
   beneintcom: "BeNe International",
+  computercentralbiz: "Computer Central",
+  copperbandtechcom: "Copperband Technologies",
   "cyber-constructioncom": "Cyber Construction",
   evolvewithuscom: "Evolve Technologies",
+  forcetechitcom: "Forcetech IT, LLC",
   "goa-techcom": "GOA-TECH",
   "hurricane-itcom": "Hurricane IT",
+  ictcom: "ICT",
   idealtechhelp: "Ideal Tech Help",
   itnsgroupcom: "IT Network Solutions Group LLC",
   meetingtreecomputercom: "Meeting Tree Computer",
+  "mylive-techcom": "Live-Tech",
   "net-techus": "Net-Tech Consulting",
   rockerio: "Rocker",
+  s3svccom: "Security Solutions Services dba S3",
   techlpcom: "Techlead Professional Services LLC",
+  techshieldmspus: "Techshield MSP",
   teledatauscom: "Teledata Cloud Services",
   vaimancom: "AVOX LLC",
   viener4gatescom: "Viener4Gates",

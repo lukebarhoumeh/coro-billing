@@ -47,7 +47,9 @@ export interface ParsedSlot {
 
 /** Hex SHA-256 of the file bytes — review state is keyed on this. */
 export async function fingerprintBytes(bytes: Uint8Array): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes as BufferSource);
+  // ArrayBufferView, not BufferSource: the root (node-lib) typecheck has no DOM
+  // BufferSource name; a Uint8Array satisfies both signatures either way.
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes as ArrayBufferView);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 

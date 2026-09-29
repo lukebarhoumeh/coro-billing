@@ -1,0 +1,95 @@
+Coro Billing Platform-20260929_100305-Meeting Recording
+September 29, 2026, 3:03PM
+15m 42s
+Luke Barhoumeh started transcription
+Luke Barhoumeh   0:03Added in, but I'll share my screen. I mean, so I before I jump into the QuickBooks stuff, did everything work like when you ran the August one?How are the results?
+Lindita Vako   0:15Elisa.Yeah, you saw there were two invoices. Those 2 didn't create correctly, at least at the first image. Like I attached the invoices, so you could have in the first e-mail I sent you, there were two invoices.
+Luke Barhoumeh   0:32Correct, I mean.
+Lindita Vako   0:33You can open the e-mail and see, because I had the screen.
+Luke Barhoumeh   0:40Yeah.There we go, okay.
+Lindita Vako   0:45Mhm.
+Luke Barhoumeh   0:45So this was a Toll.Okay, so 13.Their, their stuff is just so poorly, like, the Managed.It's like it's so confusing.So this P&L one that you sent.This is.
+Lindita Vako   1:17I didn't check every customer. To me, most of them was accurate. Like I checked that lead since that was the biggest customer. So their invoice matches to the penny, you know, like everything was correct the way the software you build generates.
+Luke Barhoumeh   1:26I see.
+Lindita Vako   1:36So it was correctly. The other two invoices were not generated. They couldn't find the price or something. I'm not sure what was missing there. What I've done in Quickbooks, Luke.I have created for each subscription like a product, which has all the information. And besides that, every time I create an invoice, for example, for tech lead, I have created a class and I put it to quorum.So every time I want to create a report, I can just pull that. Like I can sort only the, for example, when I try to pull the reports, I can exclude only that portion, the Coro.
+Luke Barhoumeh   2:22Okay.
+Lindita Vako   2:23part in Quickbooks. It has to be, it's everything manually. So there might be mistakes. For example, I create an invoice, it's fine, it's the right client, the right price, the right licenses. Somehow I forgot to put Coro, for example. So you have to make sure that.You check yourself all the time when you when you work like that in Quickbooks, because it's a lot of work behind that to do to to go that analytical, but the the the the.The reports that you can produce after that are very valuable. Like, you know how much you will make month by month from Coro. And the first one, it's kind of mixed because the invoices were not like all sent out to August for our clients and all sent out to September.
+Luke Barhoumeh   3:02Yeah.
+Lindita Vako   3:15But for the upcoming month, will be much clearer. Like for each month, you will see how much Coro charged us, how much we're charging clients, and what's the margin. And you can do that even on the client level, like how much is the margin from this client or this client only for only one month or for the entire year.
+Luke Barhoumeh   3:36Okay, I see. So then for the integration for Quickbooks, would it be beneficial? Like my idea behind it was, let's say this is all perfect. The numbers that came back match. There's a little button that you press that connects into Quickbooks and auto-generates an invoice for you to send out.Is that something that would like work essentially or is there still a manual?
+Lindita Vako   4:01It will work. It will work. So you will generate, let's say, 15 to 20 Invoices.
+Luke Barhoumeh   4:03Okay.Yeah.
+Lindita Vako   4:09They don't necessarily has to go out. We need to, usually Quickbooks doesn't do that, even though you might generate, because I've seen that even with the integration of MSP portal, the India team did that. So the Invoices are generated in the system.not necessarily there, send it out to the client. So me and that I need to take a last check on each client or each invoice, make sure that everything is correct. And it's not only about licenses and price and everything. It's about this client is excluded from the sales tax. This client wants this invoice to be...Sam to this certain e-mail address, you know, there is a lot behind that.
+Luke Barhoumeh   4:58Yeah, okay. So then for September...I'm assuming we'll still have to test this against the results that you come back with.
+Lindita Vako   5:09If she comes today, okay. Otherwise, I'll generate the invoices, you know, by myself this month and maybe we can review this next month. I think it's, because I'm not sure like what time she will reply.
+Luke Barhoumeh   5:15Yeah.Okay.Yeah, I know.
+Lindita Vako   5:26And I don't know how it will work on, you know, like...
+Luke Barhoumeh   5:26Okay.
+Lindita Vako   5:31When you will generate the Invoices, will it take longer, or how much, or what?
+Luke Barhoumeh   5:35So, right now, if I were to click, like, essentially what it is, is like, you would go through these, it would be something like this, you click into it, okay, this looks good. These are all their custom that the Msp customers that are on here, go whatever line customer by customer, or sorry, MSP by MSP.
+Lindita Vako   5:43Uh-huh.
+Luke Barhoumeh   5:56Let's say you approve them all. Look okay, they're all approved. Connect to Quickbooks.Once this works, I haven't deployed it yet, but once it works, essentially what happens is it'll give you a quick link, kind of like how the Msp Hub one is. It'll tell you to log into your Quickbooks credentials, blah, blah, blah, and then it'll tag the two.
+Lindita Vako   6:15You know, it was a process behind that when you connect something to Quickbooks. So I didn't do it all by myself. I did it through screen sharing. It was Eric and Madhu and all the team when we did that. And we took like 2 sessions. In one was completing, addingSo it wasn't that easy. So I don't know what it will require this time, to be honest.
+Luke Barhoumeh   6:41So when I was doing it in my development website that I have for this, it got me pretty much all the way to the point where I could push them into Quickbooks. Obviously, I didn't do that, but it seemed like I had it. Maybe I'm forgetting something.
+Lindita Vako   6:56Okay. No, I'm just, yeah, I'm just saying, you know, like, because I saw it took, like, I didn't know how to answer those questions, you know, and we worked, yeah, all as a team to kind of answer all the questions. Maybe Caesar is that, I'm not sure. Maybe they already did that somehow.
+Luke Barhoumeh   7:04Yeah.Did they, did they say for the actual, like, when you're when you're pushing from, I'm assuming the Quickbooks integration you're talking about is from Msp Hub into Quickbooks, right? Okay, so when you're doing that from Msp Hub into Quickbooks, do the names on Quickbooks and Msp Hub have to match?
+Lindita Vako   7:23Yes, uh-huh.
+Luke Barhoumeh   7:32Like how are they, does that make sense? Like how are they linking?
+Lindita Vako   7:35Yeah, so I have done that work ahead of time, like matching all clients, not necessarily the name is the same, but I have done that, matching the names and matching all the subscriptions before ahead of time.
+Luke Barhoumeh   7:51Okay.
+Lindita Vako   7:52So there, yeah, and I can show you like what I did, like I went and matched the names before they generated the invoices. They generate with a number that was in MSP portal though, so I kept that number, I didn't change to a different number.
+Luke Barhoumeh   8:03Opp.I see.Okay.So I really, at this point, we're just going to wait to test at the September ones and see where it comes from.
+Lindita Vako   8:21Oh, she sounded, yeah, she sounded.
+Luke Barhoumeh   8:25I can run it. Let's see what it comes back with.Elisa.This is the, this is the usage.
+Lindita Vako   8:44The Excel is should be the usage, I think.
+Luke Barhoumeh   8:49Was that one customer asked that?The one that, the one that you sent.
+Lindita Vako   9:00The one that I sent that needs to be reviewed.
+Luke Barhoumeh   9:02Yeah.I didn't realize S. I know SNI was one of them.
+Lindita Vako   9:04Sam, okay.To look, let me see.
+Luke Barhoumeh   9:13I have a usage report.
+Lindita Vako   9:14I don't know which one was, to be honest. Let me take a look.
+Luke Barhoumeh   9:18I was just curious, the estimates like a family friend.Okay.
+Lindita Vako   9:29You know, the two clients I was asking, it looks like it's Rocker Llc and the other one, Carl Drago Cyber Construction INC. Those were the twin voices that didn't match.
+Luke Barhoumeh   9:44Yeah, but those are those ones are on some like weird old, I need to.
+Lindita Vako   9:50All the old legacy.
+Luke Barhoumeh   9:54Ohh, I spelled it wrong one.This is probably not going to work well. I don't know, because they always keep on changing the pricing lists.That's.
+Lindita Vako   10:10Oh, really? They, I haven't noticed that.
+Luke Barhoumeh   10:11Sonia.So when you're doing this, you're just taking the Coro special pricing with our Excel file against the usage report, and then that's how you're reconciling the two essentially, right?
+Lindita Vako   10:26Yeah, believe it or not, Luke, how we did that, we did that on the call. Brandon telling me how much was each license because it was a total mess when they first, yeah. So, but I haven't gone back to the file because my assumption is that they don't change prices. So what is...
+Luke Barhoumeh   10:37Yeah.That's off.
+Lindita Vako   10:48decided for a certain client, for a certain subscription, should be the same in the upcoming month. So they shouldn't change that Excel file, unless for the clients that are joining. For that, they don't have to go back there.
+Luke Barhoumeh   11:02So that's why, okay, so if you look at these numbers, that's why some of these are zero now, because these were new Msp that we had brought on over the past month that weren't in the old price sheet. So I came back with 21,000 built to partners, our cost. Does this seem right? I don't know if you know these numbers off top.
+Lindita Vako   11:09Okay.18,000, I think it was more.
+Luke Barhoumeh   11:23For our costs?
+Lindita Vako   11:25How much was the involved? So the bill call 3307. Oh, why is that?
+Luke Barhoumeh   11:26Yes.
+Lindita Vako   11:34You know what I did? I forwarded her a wrong...Alright, that's why you said SNF.
+Luke Barhoumeh   11:43Yeah, I was like, was I I still buying Coro licensing?
+Lindita Vako   11:46Oh gosh, you know, it was the e-mail I got from them. Hold on, let me forward the invoice to you.So the Invoice was.20,594. Let me forward this to you. This was my mistake.
+Luke Barhoumeh   12:23No, you're good.Mm.
+Lindita Vako   12:28Forward a book.So it's not 18, like you had 18, I think? 18, no, it's more.
+Luke Barhoumeh   12:41For our cost from Coro, correct?
+Lindita Vako   12:44Yeah, so the bill that they send us, the 20...20,000, 20,594 should be our cost.
+Luke Barhoumeh   12:49Um...Brehm.So then this bill to Partner should be a higher number then.
+Lindita Vako   12:58Should be higher, yeah.
+Luke Barhoumeh   13:00Yeah, okay. All right, I'm gonna work on this sometime.
+Lindita Vako   13:03Take your time, like we have 15 minutes more. See what you can do. If you're not able for today, I can just, you know, because it's not, it won't take longer for the existing client. I will just recreate the invoice that already is in the system. I will just change the.the consumption. And I probably what I will do today, I will only add those customers that I don't have, I haven't sent an invoice yet.
+Luke Barhoumeh   13:24Yeah, I'll.I'll update this.Okay.
+Lindita Vako   13:34That will be really my work for today. But for this, it's more easier for me. Like I will just take a look at the consumption, how much, change the numbers, because the consumption is that changes, the price won't change for the subscription.
+Luke Barhoumeh   13:49Okay, would it be beneficial even if like, let's say this didn't work fully, but it tracked like it was able just to tell you already the usage report underneath the pricing?
+Lindita Vako   13:50Okay.Yeah, because for example, I wasn't able to find out for each invoice how much was the margin for each invoice, but this tool...
+Luke Barhoumeh   14:04Okay.
+Lindita Vako   14:12Can can create that report like in, yeah, in seconds.For me, I have to look around to find that, you know what I mean? Like, not really.
+Luke Barhoumeh   14:24Yeah, alright, let me.
+Lindita Vako   14:25But like, it's not, you know, look, it's not that urgent, meaning like, I can do one more month. If we can generate the Invoices for next, let's take another time. The end of the month and the beginning of the month are kind of crazy, that's why. So I don't want to create extra.
+Luke Barhoumeh   14:42Okay.
+Lindita Vako   14:46work. Let's try, for example, in the middle of the month to look where we are at, and then at the end of the month, we'll be ready to generate on its own. Like, whatever you do. Sounds better.
+Luke Barhoumeh   14:56Yeah, that's fine.What I'm gonna, yeah, what I'm gonna do anyways, though, I'm gonna, whatever you come back with for the first September, I want to take the information that you just gave me, and I'm still going to build it out so we can at least test it and see what was off.
+Lindita Vako   15:12We can test, yeah, we can test even in the middle of the month, generate those invoices. We can delete from Quickbooks. It's not an issue.
+Luke Barhoumeh   15:21Yeah.
+Lindita Vako   15:22Okay, and see how the system generates it. We can make a test after we kind of create it. It's fine. I think should be fine, yeah.
+Luke Barhoumeh   15:23Okay.Okay. Sounds good.
+Lindita Vako   15:34Okay, okay, perfect. Thank you so much.
+Luke Barhoumeh   15:37Of course. All right, I'll talk to you then. Bye.
+Lindita Vako   15:38Bye.
+Lindita Vako stopped transcription

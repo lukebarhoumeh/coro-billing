@@ -55,6 +55,37 @@ corrected packet (Luke dropped it in `Desktop\CoroBillingFolder`; adopted here):
   `agreement/MSP Hub - Coro Hybrid Distributor Agreement (2 tier) V2 after cmnts.docx.pdf`
   (DocuSign-executed 7/14/2026); the MSRP workbook is byte-identical to the archived copy.
 
+## 2026-09-29 — the September packet (`2026-09/`)
+
+Landed via Lita's forward of Lisa's (Coro AR) email plus the Luke/Lindita call
+(`Coro Billing - Luke and Lindita (2026-09-29).docx`, extracted to
+`_lindita_2026-09-29_transcript_extracted.txt`):
+
+- **`2026-09/Coro Special MSP Pricing(Special Pricing).csv`** — Jack's revised
+  sheet (45 partner blocks) and the canonical September rate card. Every parent
+  new since August now carries rates (ICT, S-3, Live-Tech, Copperband,
+  Auditlytics, Computer Central, ForceTech, Albany IT, TechShield, BeNe…);
+  Albany IT's "BUEmail Flex" row now reads 58% total off list ($3.15 to Hub) —
+  the correction Lisa announced. The August sheet in `2026-08/` stays August's
+  canonical card; do not backport.
+- **`2026-09/MSP Hub_September 2026 Usage.xlsx`** — the monthly usage report,
+  25 parent workspaces, quantities from the Audit strings as usual.
+- **`2026-09/Coro_Invoice_INVCUS2026-0002512.pdf`** — Coro's September bill
+  ($20,594.49, NET 45, due Nov 8) as originally delivered (identical bytes to
+  the packet's `Transaction_621390.pdf`, so that duplicate was not kept).
+  **`CustInvc_621390.pdf`** is the updated print showing the credit applied
+  (Balance Due $20,509.66); **`CustCred_624147.pdf`** is credit memo
+  **CMCUS2026-0000106** (−$84.83 = 87 × 0.975, Albany IT Email Protection
+  repriced 45% → 58% total, per Brandon).
+- **`2026-09/Coro_Invoice_INVCUS2026-0002512.xlsx`** — DERIVED, not delivered:
+  Coro only sent the PDF, and the workbench invoice slot needs a workbook. The
+  63 lines were transcribed 1:1 and the credit memo rides as a qty-0 −$84.83
+  row; `_build_2512_xlsx.mjs` beside it regenerates the file and asserts the
+  $20,594.49 / $20,509.66 tie before writing. If Coro ever sends a real XLSX
+  of 2512, that replaces this transcription.
+- `workbench-screenshot-2026-09-29.png` — Luke's morning run (pre-packet
+  numbers), kept for before/after context.
+
 ## Naming convention going forward
 
 Keep vendor filenames when they are unique. If Coro sends another `Copy of …` or `(1)` duplicate, prefix with the invoice month:

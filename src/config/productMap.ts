@@ -46,6 +46,14 @@ const CURRENT_EXACT: Readonly<Record<string, readonly string[]>> = {
   "cor-endp-c": ["coro ai endpoint"],
   "cor-lte-c": ["coro ai lite"],
   "cor-manage-c": ["coro managed/monthly", "coro managed"],
+  // COR-USERD-C — first seen Sept 2026 (Auditlytics, usage product
+  // USER_DATA_GOVERNANCE; invoice 2512 "CORO USER DATA GOVERNANCE", list
+  // $7.50 = the modules list). User Data Governance is a single module, and
+  // modules price from the partner's modules row (Coro's 2026-09-22 module
+  // answer; same premise as the MOD*flex chain) — for a current-gen code
+  // that is the current-gen "Coro AI Modules" row, after any card row that
+  // ever names the product itself.
+  "cor-userd-c": ["coro user data governance", "user data governance", "coro ai modules"],
 };
 
 /** MOD code → its product-specific flex row name(s). */
@@ -90,6 +98,16 @@ const LEGACY_BUNDLES: Readonly<
   bucommngflex: {
     flex: ["complete managed flex", "complete flex"],
     current: ["coro ai complete"],
+  },
+  // BUCORMNGflex — first seen Sept 2026 (invoice 2512 bills S3 94 × "MANAGED
+  // CORO ESSENTIALS Flex" @ 5.78, list $10.50). Resolves ONLY from a managed-
+  // essentials row (B2B Technologies carries one); no unmanaged fallback — a
+  // managed bundle priced from a plain Essentials row would understate L by
+  // the service fee, so a card without the row holds honestly (S-3's does,
+  // 2026-09-29 sheet — rate requested from Jack/Brandon).
+  bucormngflex: {
+    flex: ["managed coro essentials flex", "managed essentials flex", "essentials managed flex"],
+    current: [],
   },
   buendflex: { flex: ["endpoint protection flex"], current: ["coro ai endpoint"] },
   buemailflex: { flex: ["email protection flex", "buemail flex", "email flex"], current: [] },
