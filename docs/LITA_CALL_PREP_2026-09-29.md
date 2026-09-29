@@ -38,6 +38,35 @@ than she bills on Classic (7.20), modules (3.00), SAT (1.40), Cyber Managed Clas
 (10.20) — ~$304/mo if that repricing was intentional. We adopted her rates; repricing
 partners upward is a business decision for later.
 
+## LATE ADD — Coro's SEPTEMBER bill landed (INVCUS2026-0002512, 2026-09-28)
+
+$20,594.49, Sep 1–30 service, NET 45 due Nov 8. PDF at `data/2026-09/`. Line-sum ties
+to the cent. What it changes for this call:
+
+- **Coro fixed their billing.** September rates follow the correct partner-specific
+  additive discounts everywhere spot-checked (Techlead 65%→5.25, Rocker 63%→5.55,
+  Classic flat-45→6.59, SAT→1.10). Credits stop accruing; **August's $1,041.38 is
+  still owed** — now a cleanly bounded, one-month claim.
+- **Rocker double-bill, two months confirmed.** September again bills ONLY 46 AI
+  Complete for Rocker — no legacy — matching the August audit. Her invoice 10601's
+  legacy $460.35 now looks like a genuine double-bill of Rocker.
+- **Mass migration to AI SKUs.** Cyber's whole legacy stack is gone (now AI Complete
+  47 + AI Essentials 26); Evolve folded to 34 AI Complete; XTB, Amplivity, and
+  Teledata's Essentials migrated; Techlead moved to AI Complete 337 + CORO MANAGED
+  337 (+7 residual Managed-Complete-Flex). Her September invoices will look
+  structurally different — need her AI sell rates for migrated partners.
+- **$10,194.54 of the bill is NEW parents:** ICT $5,295.95 (1,266 Essentials Flex!),
+  S3 $1,415.43 (new SKUs: MDR Flex, three SOC Flex, Managed Essentials Flex),
+  Live-Tech, Copperband, Auditlytics (new COR-USERD-C SKU), Computer Central,
+  Forcetech, Albany IT, Techshield. None have sell rates on the pricing sheet —
+  the September close will hold them until rates exist. Ask who prices these.
+- **Challenge line:** Coro billed "MSP Hub - Disti/MSP" itself $602.25 (73 AI
+  Complete) — our own workspace. Should Hub be paying for Hub?
+- **BeNe International is MISSING from the September bill entirely** (a $1,032/mo
+  billed partner in August) — churn or a Coro miss? Ask.
+- Logistics: we need the **XLSX** version of 2512 for the workbench's invoice slot
+  (PDF only so far).
+
 ## The call (30 min)
 
 1. **(5) Show the tie-out.** Her August line-by-line now matches QB exactly. Ask her to

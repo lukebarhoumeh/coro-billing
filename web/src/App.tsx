@@ -70,7 +70,8 @@ function FileChip({ label, loaded }: { label: string; loaded: string | undefined
         "inline-flex max-w-44 items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-xs",
         loaded
           ? "border-success/40 bg-success/10 text-success"
-          : "border-edge bg-glass-1 text-muted-foreground backdrop-blur-[10px]"
+          : // translucent only — tiny chips don't earn a blur surface (spec §1 blur budget)
+            "border-edge bg-glass-1 text-muted-foreground"
       )}
       title={loaded ?? `${label} not loaded`}
     >
