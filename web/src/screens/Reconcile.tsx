@@ -39,6 +39,7 @@ const MATCH_LABEL: Partial<Record<MatchKind, string>> = {
   "fallback-current": "fallback",
   "add-module": "module",
   "mislabel-override": "mislabel fix",
+  "off-card": "off-card rate",
   nfr: "NFR",
   none: "no rate",
 };

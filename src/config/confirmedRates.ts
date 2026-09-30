@@ -23,13 +23,14 @@
  * 2026-09-29 call prep (docs/LITA_CALL_PREP_2026-09-29.md).
  */
 import { Money } from "../lib/money.js";
+import type { Period } from "../domain/types.js";
 
 /**
  * Participates in the web review/pushed localStorage keys (loadFiles.ts,
  * qbo.ts) — bump on ANY table change so stale approvals and pushed-state from
  * the previous rates invalidate instead of silently attaching to new numbers.
  */
-export const CONFIRMED_RATES_REVISION = 1;
+export const CONFIRMED_RATES_REVISION = 2; // bumped 2026-09-30: Net-Tech rates corrected to invoice 10625
 
 export interface ConfirmedRate {
   readonly rate: Money;
@@ -40,6 +41,12 @@ export interface ConfirmedRate {
 interface Entry {
   readonly rate: string;
   readonly source: string;
+  /**
+   * When set, the entry applies ONLY to this close period — a historical rate a
+   * later month's pricing card has since corrected (e.g. Net-Tech's legacy rates
+   * before Coro moved it to modern bundles). Omit for period-stable rates.
+   */
+  readonly period?: Period;
 }
 
 /** Keyed `${card name, lowercased}|${vendor SKU, lowercased}`. */
@@ -61,9 +68,14 @@ const TABLE: Readonly<Record<string, Entry>> = {
   "cyber construction|addsecurewebflex": { rate: "2.50", source: "QB inv 10597, modules at 2.50" },
 
   // --- Net-Tech (her QB: Net-Tech) ---
-  "net-tech|bucoclassflex": { rate: "6.59", source: "QB inv 10550, 207×6.59" },
-  "net-tech|buemailflex": { rate: "4.12", source: "QB inv 10550, 100×4.12" },
-  "net-tech|modcloudflex": { rate: "2.50", source: "QB inv 10550, modules at 2.50" },
+  // Net-Tech's legacy rates as billed in AUGUST (Lita's QB inv 10550). Coro moved
+  // Net-Tech to modern bundles the week of 2026-09-29, so its SEPTEMBER rates
+  // differ — Classic 7.20 / Email 3.00 / Cloud 3.00 per her revised invoice 10625,
+  // which the current pricing card already carries. These three are period-gated
+  // to 2026-08 so the stale Aug override doesn't clobber September's correct card.
+  "net-tech|bucoclassflex": { rate: "6.59", source: "QB inv 10550 (Aug), 207×6.59", period: "2026-08" },
+  "net-tech|buemailflex": { rate: "4.12", source: "QB inv 10550 (Aug), 100×4.12", period: "2026-08" },
+  "net-tech|modcloudflex": { rate: "2.50", source: "QB inv 10550 (Aug), modules at 2.50", period: "2026-08" },
   "net-tech|modemailflex": { rate: "2.50", source: "QB inv 10550, modules at 2.50" },
   "net-tech|modenddataflex": { rate: "2.50", source: "QB inv 10550, modules at 2.50" },
   "net-tech|modendsecflex": { rate: "2.50", source: "QB inv 10550, modules at 2.50" },
@@ -96,8 +108,14 @@ const TABLE: Readonly<Record<string, Entry>> = {
 };
 
 /** The confirmed bill-out rate for a partner×SKU, or null when the card rules. */
-export function resolveConfirmedRate(cardName: string, vendorSku: string): ConfirmedRate | null {
+export function resolveConfirmedRate(
+  period: Period,
+  cardName: string,
+  vendorSku: string
+): ConfirmedRate | null {
   const entry = TABLE[`${cardName.trim().toLowerCase()}|${vendorSku.trim().toLowerCase()}`];
   if (entry === undefined) return null;
+  // A period-gated entry (a historical rate) applies only to its own period.
+  if (entry.period !== undefined && entry.period !== period) return null;
   return { rate: Money.of(entry.rate), source: entry.source };
 }

@@ -13,17 +13,19 @@
  * Every number here was DERIVED from the packet and then pinned. What the
  * assertions encode:
  *   - all 25 usage workspaces join the new sheet (9 parents new since August);
- *   - ONE held line: S3's 94 × MANAGED CORO ESSENTIALS Flex ($542.85 of Coro
- *     cost) — S-3's card has no managed-essentials rate; rate requested from
- *     Jack/Brandon, never invented;
+ *   - S3's 94 × MANAGED CORO ESSENTIALS Flex was held (S-3's card has no
+ *     managed-essentials rate) until Brandon (Coro) supplied it 2026-09-30 —
+ *     now billed off-card at $5.50 (config/offCardRates.ts), cost $4.88, so the
+ *     ~$5.78 Coro invoiced ($542.85) adds an $84.13 credit; ZERO lines held;
  *   - Albany IT nets to the corrected cost (87 × 3.15 = 274.05) — the ONE
  *     legacy-discount fix Coro has processed; no credit-expected remains;
- *   - CREDIT_EXPECTED $1,791.54 over 5 partners — the "other changes we are
+ *   - CREDIT_EXPECTED $1,875.66 over 5 partners — the "other changes we are
  *     working on with some of the legacy discounts" per Lisa's email
- *     (ICT $1,329.30 alone: 1,266 Essentials Flex billed flat-45 vs 54+5);
+ *     (ICT $1,329.30 alone: 1,266 Essentials Flex billed flat-45 vs 54+5; S-3
+ *     now $372.51 incl. the $84.13 managed-essentials cost gap);
  *   - Lita said on the call our cost should be the invoice's $20,594.49 and
- *     "bill to Partner should be higher" — drafted L $21,151.44 is;
- *   - margin is cash-true (actual where invoiced): $1,184.63, three partners
+ *     "bill to Partner should be higher" — drafted L $21,732.71 is;
+ *   - margin is cash-true (actual where invoiced): $1,223.05, three partners
  *     negative until Coro's remaining credits land;
  *   - BeNe International consumed (73 AI Complete) but is absent from
  *     invoice 2512 — margin rides the expected-additive basis; raised with
@@ -77,28 +79,39 @@ describe.skipIf(!hasRealData)("September 2026 rate-card close — real packet", 
     expect(model.cardOnly).toHaveLength(20); // signed-but-quiet, incl. the still-unlanded new partners
   });
 
-  it("foots the month: L $21,151.44, actual H $19,364.56, margin $1,184.63", () => {
+  it("foots the month: L $21,732.71, actual H $19,907.41, margin $1,223.05", () => {
     const totalL = model.partners.reduce((s, p) => s + p.totalL.toNumber(), 0);
     const totalHActual = model.partners.reduce((s, p) => s + (p.totalHActual?.toNumber() ?? 0), 0);
     const totalHExpected = model.partners.reduce((s, p) => s + p.totalHExpected.toNumber(), 0);
     const totalMargin = model.partners.reduce((s, p) => s + p.totalMargin.toNumber(), 0);
     // Lita, on the call: cost is the invoice's 20,594.49, so billed-to-partner
-    // "should be higher" — it is. Actual-H here is the invoice's in-period
-    // matched lines: 20,509.66 (balance due, post-credit) minus the $602.25
-    // Hub-self line (no usage) and the $542.85 held S3 managed-essentials line.
-    expect(totalL.toFixed(2)).toBe("21151.44");
-    expect(totalHActual.toFixed(2)).toBe("19364.56");
-    expect(totalHExpected.toFixed(2)).toBe("18353.67"); // Money-exact 18,353.68; float sum drops a cent
-    expect(totalMargin.toFixed(2)).toBe("1184.63");
+    // "should be higher" — it is. Actual-H is the invoice's in-period matched
+    // lines: 20,509.66 (balance due, post-credit) minus the $602.25 Hub-self
+    // line (no usage). Two 2026-09-30 corrections lift L over the first packet's
+    // 21,151.44: S3's managed-essentials now bills off-card (+517.00 L / +542.85
+    // H, was held) and Net-Tech's sell rates match invoice 10625 (+64.27 L, cost
+    // unchanged) — so margin rises to 1,223.05.
+    expect(totalL.toFixed(2)).toBe("21732.71");
+    expect(totalHActual.toFixed(2)).toBe("19907.41");
+    expect(totalHExpected.toFixed(2)).toBe("18812.39"); // Money-exact 18,812.40; float sum drops a cent
+    expect(totalMargin.toFixed(2)).toBe("1223.05");
   });
 
-  it("holds exactly ONE line — S3's managed-essentials (no rate on S-3's card)", () => {
+  it("holds ZERO lines — S3's managed-essentials now bills off-card (Brandon 2026-09-30)", () => {
     const held = model.partners.flatMap((p) =>
       p.lines
-        .filter((l) => l.matchKind === "none" || (l.matchKind !== "nfr" && l.unitL === null))
+        .filter((l) => l.matchKind !== "nfr" && l.unitL === null)
         .map((l) => `${p.cardName}|${l.vendorSku}`)
     );
-    expect(held).toEqual(["S-3|BUCORMNGflex"]);
+    expect(held).toEqual([]);
+    // The one-time held line, now resolved from config/offCardRates.ts.
+    const s3 = model.partners.find((p) => p.cardName === "S-3")!;
+    const mgd = s3.lines.find((l) => l.vendorSku.toLowerCase() === "bucormngflex")!;
+    expect(mgd.matchKind).toBe("off-card");
+    expect(mgd.unitL!.toFixed2()).toBe("5.50"); // $5.50 to the partner
+    expect(mgd.expectedHAdditive!.toFixed2()).toBe("4.88"); // $4.88 to MSP Hub
+    expect(mgd.actualHAmount!.toFixed2()).toBe("542.85"); // Coro invoiced 94 × ~5.78
+    expect(mgd.creditExpected!.toFixed2()).toBe("84.13"); // the 5.78→4.88 cost gap
   });
 
   it("Albany IT nets to the corrected 58%-total cost — credit memo CMCUS2026-0000106 landed", () => {
@@ -114,10 +127,10 @@ describe.skipIf(!hasRealData)("September 2026 rate-card close — real packet", 
     expect(albany.totalMargin.toFixed2()).toBe("30.45");
   });
 
-  it("quantifies the remaining legacy over-bills — $1,791.54 over 5 partners", () => {
+  it("quantifies the remaining legacy over-bills — $1,875.66 over 5 partners", () => {
     // Lisa's 2026-09-29 email: "Brandon can share the other changes we are
     // working on with some of the legacy discounts." This is that list.
-    expect(model.totalCreditExpected.toFixed2()).toBe("1791.54");
+    expect(model.totalCreditExpected.toFixed2()).toBe("1875.66");
     const byPartner = Object.fromEntries(
       model.partners
         .filter((p) => p.totalCreditExpected.toCents() !== 0)
@@ -127,9 +140,20 @@ describe.skipIf(!hasRealData)("September 2026 rate-card close — real packet", 
       "ForceTech IT, LLC": "0.48",
       ICT: "1329.30", // 1,266 Essentials Flex @ flat 4.125 vs 54+5 → 3.075
       "Net-Tech": "150.00", // same email-protection over-bill as August
-      "S-3": "288.38",
+      "S-3": "372.51", // 288.38 + the 84.13 off-card managed-essentials cost gap
       "Teledata Cloud Services": "23.38",
     });
+  });
+
+  it("Net-Tech drafts to Invoice 10625's $2,180.40 — the corrected sell rates (Coro 2026-09-30)", () => {
+    // Lida's revised Net-Tech invoice 10625 (parsed 2026-09-30) is the pricing
+    // authority; our confirmedRates were stale on three sell (L) lines.
+    const nt = model.partners.find((p) => p.cardName === "Net-Tech")!;
+    expect(nt.totalL.toFixed2()).toBe("2180.40"); // ties invoice 10625 to the cent
+    const rate = (sku: string) => nt.lines.find((l) => l.vendorSku.toLowerCase() === sku)!.unitL!.toFixed2();
+    expect(rate("bucoclassflex")).toBe("7.20"); // $7.20 partner / $6.60 Hub (was 6.59 ≈ cost, ~0 margin)
+    expect(rate("buemailflex")).toBe("3.00"); // Email Protection Flex (was 4.12)
+    expect(rate("modcloudflex")).toBe("3.00"); // Cloud Security Flex = module $3.00 (was 2.50)
   });
 
   it("prices Auditlytics COR-USERD-C from the current-gen modules row — and flags Coro's 45%", () => {
@@ -180,16 +204,15 @@ describe.skipIf(!hasRealData)("September 2026 rate-card close — real packet", 
       INVOICE_RATE_UNEXPECTED: 9, // Auditlytics USERD 45%, CC endpoint 63%, Live-Tech/S-3 module under-bills
       INVOICE_QTY_DISAGREES: 1, // Computer Central endpoint: audit 166 vs invoiced 167
       PRODUCT_FALLBACK: 3,
-      CREDIT_EXPECTED: 6, // $1,791.54 — the pending Brandon corrections
-      RATE_OVERRIDE_APPLIED: 8, // Lita's confirmed rates carrying into September lines
+      CREDIT_EXPECTED: 7, // $1,875.66 — pending Brandon corrections + S3 off-card cost gap
+      RATE_OVERRIDE_APPLIED: 6, // was 8; −3 Net-Tech now match the card (10625), +1 S3 off-card
       NFR_LINE: 1, // Hurricane IT
-      UNKNOWN_PRODUCT_CODE: 1, // the held S3 managed-essentials line
       NO_USAGE_BREAKDOWN: 1, // the Hub self-bill
     });
   });
 
-  it("emits 245 rated lines for QuickBooks and is deterministic", () => {
-    expect(model.ratedLines).toHaveLength(245);
+  it("emits 246 rated lines for QuickBooks and is deterministic", () => {
+    expect(model.ratedLines).toHaveLength(246);
     expect(buildModel()).toEqual(model);
   });
 });

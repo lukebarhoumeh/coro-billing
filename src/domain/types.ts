@@ -390,6 +390,7 @@ export type MatchKind =
   | "fallback-current" // legacy/flex code priced from the current-gen row (surfaced)
   | "add-module" // ADD*flex priced via the modules chain — confirmed by Coro 2026-09-22
   | "mislabel-override" // matched via a curated sheet-mislabel signature (see productMap CLASSIC_MISLABEL)
+  | "off-card" // priced from a curated off-card confirmed rate (config/offCardRates.ts) — product absent from the card
   | "nfr" // not-for-resale — non-billable
   | "none"; // no pricing row at all — the close HOLDS the line
 

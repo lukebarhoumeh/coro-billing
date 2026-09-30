@@ -30,6 +30,7 @@ import { resolvePricingRow } from "../config/productMap.js";
 import { validateListPrices } from "../ingest/specialPricing.js";
 import { PARTNER_SLUG_MAP, stripWorkspaceSuffix } from "../config/partners.js";
 import { resolveConfirmedRate } from "../config/confirmedRates.js";
+import { resolveOffCardRate } from "../config/offCardRates.js";
 import { classifyInvoiceSku } from "./invoiceClose.js";
 import type {
   CloseModel,
@@ -196,6 +197,9 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       const flist: Exception[] = [];
       const match = resolvePricingRow(card, g.vendorSku);
       const row = match.row;
+      // Coro/accounting-confirmed rate for a product ABSENT from this card —
+      // makes an otherwise-held ("none") line billable; see config/offCardRates.ts.
+      const offCard = match.kind === "none" ? resolveOffCardRate(card.name, g.vendorSku) : null;
 
       const customers = [...g.customers].sort((a, b) => {
         if (a.customer === null) return b.customer === null ? 0 : -1;
@@ -215,8 +219,8 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       if (invoiceAgg) invoiceAgg.consumed = true;
 
       // --- match-kind findings ---
-      const productLabel = row?.product ?? g.productName ?? g.vendorSku;
-      if (match.kind === "none") {
+      const productLabel = row?.product ?? offCard?.productLabel ?? g.productName ?? g.vendorSku;
+      if (match.kind === "none" && offCard === null) {
         flist.push(
           exception("UNKNOWN_PRODUCT_CODE", "block", card.name, g.vendorSku, period,
             `${match.reason} — line HELD; nothing invented`)
@@ -237,14 +241,16 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
         );
       }
 
-      const billable = match.kind !== "nfr" && match.kind !== "none";
+      const cardBillable = match.kind !== "nfr" && match.kind !== "none";
+      const billable = cardBillable || offCard !== null;
       // The accounting team's QB invoices are the pricing authority (Luke,
       // 2026-09-28): a curated confirmed rate overrides the card's col E,
-      // visibly. It corrects a PRICE only — an unresolved product code
-      // (match "none") still holds; the override never invents a product.
-      const sheetL = billable ? (row?.netMsp ?? null) : null;
-      const confirmed = billable ? resolveConfirmedRate(card.name, g.vendorSku) : null;
-      const unitL = confirmed !== null ? confirmed.rate : sheetL;
+      // visibly (confirmedRates). An unresolved product code ("none") holds —
+      // UNLESS an off-card confirmed rate exists for it (offCardRates), the
+      // deliberate, Coro-written exception that makes the held line billable.
+      const sheetL = cardBillable ? (row?.netMsp ?? null) : null;
+      const confirmed = cardBillable ? resolveConfirmedRate(period, card.name, g.vendorSku) : null;
+      const unitL = offCard !== null ? offCard.sellRate : confirmed !== null ? confirmed.rate : sheetL;
       if (confirmed !== null && (sheetL === null || sheetL.toCents() !== confirmed.rate.toCents())) {
         flist.push(
           exception("RATE_OVERRIDE_APPLIED", "info", card.name, g.vendorSku, period,
@@ -254,6 +260,14 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
               ` — drafting the accounting-confirmed rate ${confirmed.rate.toFixed2()} ` +
               `(${confirmed.source})`,
             row?.sourceRow)
+        );
+      }
+      if (offCard !== null) {
+        flist.push(
+          exception("RATE_OVERRIDE_APPLIED", "info", card.name, g.vendorSku, period,
+            `"${offCard.productLabel}" has no row on ${card.name}'s card — drafting the ` +
+              `Coro-confirmed off-card rate ${offCard.sellRate.toFixed2()}/unit ` +
+              `(cost ${offCard.expectedCost.toFixed2()}; ${offCard.source})`)
         );
       }
       if (billable && unitL === null) {
@@ -293,6 +307,9 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
         }
         expectedHAdditive = forced;
       }
+      // An off-card confirmed rate carries its own additive cost (no card row to
+      // derive it): use it so margin and the credit cross-check have a basis.
+      if (offCard !== null) expectedHAdditive = offCard.expectedCost;
 
       // --- invoice actuals + cross-check findings ---
       let actualHAmount: Money | null = null;
@@ -386,7 +403,7 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
         productLabel,
         quantity: g.quantity,
         customers,
-        matchKind: match.kind,
+        matchKind: offCard !== null ? "off-card" : match.kind,
         unitL,
         amountL,
         expectedHSheet,
@@ -403,7 +420,7 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       lineFindings.push(...flist);
 
       // --- rated lines for QuickBooks reuse (billable, priced lines only) ---
-      if (billable && unitL !== null && row !== null) {
+      if (billable && unitL !== null && (row !== null || offCard !== null)) {
         // Unit cost basis for the rated view. The CloseModel keeps the
         // authoritative amounts; this unit×qty view is what QB export needs.
         const costUnit = actualHUnit ?? expectedHAdditive ?? expectedHSheet ?? Money.zero();
@@ -433,12 +450,17 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
               class: classifyInvoiceSku(g.vendorSku),
               hubCost: costUnit,
               mspPrice: unitL,
-              discountPct: row.totalDiscountPct ?? undefined,
-              source: confirmed !== null ? `confirmed rate (${confirmed.source})` : "special-pricing CSV",
+              discountPct: row?.totalDiscountPct ?? undefined,
+              source:
+                offCard !== null
+                  ? `off-card confirmed rate (${offCard.source})`
+                  : confirmed !== null
+                    ? `confirmed rate (${confirmed.source})`
+                    : "special-pricing CSV",
               raw: {},
             },
             exceptions: flist,
-            sourceRow: row.sourceRow,
+            sourceRow: row?.sourceRow ?? 0,
           });
         }
       }
@@ -468,9 +490,7 @@ export function closeFromRateCard(args: RateCardCloseArgs): CloseModel {
       totalCreditExpected: sum(
         lines.filter((l) => l.creditExpected !== null).map((l) => l.creditExpected!)
       ),
-      heldLines: lines.filter(
-        (l) => l.matchKind === "none" || (l.matchKind !== "nfr" && l.unitL === null)
-      ).length,
+      heldLines: lines.filter((l) => l.matchKind !== "nfr" && l.unitL === null).length,
     });
   }
 
