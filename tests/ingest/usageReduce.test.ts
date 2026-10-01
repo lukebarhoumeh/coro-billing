@@ -138,6 +138,26 @@ describe("reduceUsage — real metric model", () => {
     expect(exceptions).toHaveLength(0);
   });
 
+  it("sums each CHANNEL workspace's own audit when a partner has more than one", () => {
+    // Real September case: Computer Central's Endpoint rolled up the parent
+    // workspace (audit =52) AND a second CHANNEL-typed sub-workspace (audit =1).
+    // Both are partner-level; collapsing them to one null bucket must SUM their
+    // separate audits (53), not bill only the first row's audit (52) and silently
+    // drop the rest — which produced a phantom usage-vs-invoice mismatch.
+    const aParent = "NEW | u=1 d=52 | CORO_AI_ENDPOINT=52 [devices]";
+    const aSecond = "NEW | u=0 d=1 | CORO_AI_ENDPOINT=1 [devices]";
+    const lines = parse([
+      [1, "amplivitycom_NE7N_b", "amplivitycom_NE7N_b", "CHANNEL", "SUBSCRIPTION", "NEW", "US", aParent, "CORO_AI_ENDPOINT", "COR-ENDP-C", "Users", 1],
+      [1, "amplivitycom_NE7N_b", "amplivitycom_NE7N_b", "CHANNEL", "SUBSCRIPTION", "NEW", "US", aParent, "CORO_AI_ENDPOINT", "COR-ENDP-C", "Devices", 52],
+      [2, "amplivitycom_NE7N_b", "bonardissub_BBBB_b", "CHANNEL", "SUBSCRIPTION", "NEW", "US", aSecond, "CORO_AI_ENDPOINT", "COR-ENDP-C", "Users", 0],
+      [2, "amplivitycom_NE7N_b", "bonardissub_BBBB_b", "CHANNEL", "SUBSCRIPTION", "NEW", "US", aSecond, "CORO_AI_ENDPOINT", "COR-ENDP-C", "Devices", 1],
+    ]);
+    const ep = reduceUsage(lines).billed.filter((b) => b.sku.vendorSku === "COR-ENDP-C");
+    expect(ep).toHaveLength(1); // both roll up to one partner-level line
+    expect(ep[0]!.customer).toBeNull();
+    expect(ep[0]!.quantity).toBe(53); // 52 + 1 — the bug billed only 52
+  });
+
   it("flags AUDIT_QTY_MISMATCH when Coro's stated qty disagrees with the metrics, and uses the stated qty", () => {
     const audit = "NEW | u=10 d=3 | CORO_AI_COMPLETE=99 [users]";
     const lines = parse([

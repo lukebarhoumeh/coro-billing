@@ -139,8 +139,15 @@ export function reduceUsage(lines: readonly UsageLine[]): ReducedUsage {
       (line.customer !== null && line.customer === line.partner);
     const customer = isChannel ? null : line.customer;
 
+    // Group key: channel rows are keyed by their OWN workspace, not collapsed into
+    // a single null bucket. Two distinct CHANNEL workspaces under one partner (a
+    // parent plus a channel-typed sub-workspace — real: Computer Central + its
+    // bonardiscom workspace) each state their own audited quantity; sharing a group
+    // would bill only the first row's audit and silently drop the rest. They still
+    // OUTPUT as partner-level (customer null) and are summed back together below.
+    const groupKeyCustomer = isChannel ? (line.customer ?? line.partner) : line.customer;
     // JSON key: collision-free (null customer vs "" customer handled natively).
-    const key = JSON.stringify([canon.name, customer, line.sku.vendorSku]);
+    const key = JSON.stringify([canon.name, groupKeyCustomer, line.sku.vendorSku]);
     let g = groups.get(key);
     if (!g) {
       g = {
@@ -226,5 +233,27 @@ export function reduceUsage(lines: readonly UsageLine[]): ReducedUsage {
     });
   }
 
-  return { billed, exceptions };
+  // Partner-level roll-up: distinct CHANNEL workspaces under one partner were
+  // reduced separately (so each applied its own audit) but all carry customer=null.
+  // Coalesce them into a single partner-level line per (partner, sku), summing the
+  // individually-audited quantities. Child lines have unique (partner, customer,
+  // sku) keys, so they pass through untouched and in first-seen order.
+  const rollup = new Map<string, { line: UsageLine; quantity: number }>();
+  const order: string[] = [];
+  for (const b of billed) {
+    const mk = JSON.stringify([b.partner, b.customer, b.sku.vendorSku]);
+    const seen = rollup.get(mk);
+    if (seen) {
+      seen.quantity += b.quantity;
+    } else {
+      rollup.set(mk, { line: b, quantity: b.quantity });
+      order.push(mk);
+    }
+  }
+  const merged = order.map((mk) => {
+    const seen = rollup.get(mk)!;
+    return seen.quantity === seen.line.quantity ? seen.line : { ...seen.line, quantity: seen.quantity };
+  });
+
+  return { billed: merged, exceptions };
 }

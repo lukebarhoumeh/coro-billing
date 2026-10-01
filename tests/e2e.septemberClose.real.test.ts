@@ -24,8 +24,8 @@
  *     (ICT $1,329.30 alone: 1,266 Essentials Flex billed flat-45 vs 54+5; S-3
  *     now $372.51 incl. the $84.13 managed-essentials cost gap);
  *   - Lita said on the call our cost should be the invoice's $20,594.49 and
- *     "bill to Partner should be higher" — drafted L $21,732.71 is;
- *   - margin is cash-true (actual where invoiced): $1,223.05, three partners
+ *     "bill to Partner should be higher" — drafted L $21,735.91 is;
+ *   - margin is cash-true (actual where invoiced): $1,226.25, three partners
  *     negative until Coro's remaining credits land;
  *   - BeNe International consumed (73 AI Complete) but is absent from
  *     invoice 2512 — margin rides the expected-additive basis; raised with
@@ -79,7 +79,7 @@ describe.skipIf(!hasRealData)("September 2026 rate-card close — real packet", 
     expect(model.cardOnly).toHaveLength(20); // signed-but-quiet, incl. the still-unlanded new partners
   });
 
-  it("foots the month: L $21,732.71, actual H $19,907.41, margin $1,223.05", () => {
+  it("foots the month: L $21,735.91, actual H $19,907.41, margin $1,226.25", () => {
     const totalL = model.partners.reduce((s, p) => s + p.totalL.toNumber(), 0);
     const totalHActual = model.partners.reduce((s, p) => s + (p.totalHActual?.toNumber() ?? 0), 0);
     const totalHExpected = model.partners.reduce((s, p) => s + p.totalHExpected.toNumber(), 0);
@@ -90,11 +90,15 @@ describe.skipIf(!hasRealData)("September 2026 rate-card close — real packet", 
     // line (no usage). Two 2026-09-30 corrections lift L over the first packet's
     // 21,151.44: S3's managed-essentials now bills off-card (+517.00 L / +542.85
     // H, was held) and Net-Tech's sell rates match invoice 10625 (+64.27 L, cost
-    // unchanged) — so margin rises to 1,223.05.
-    expect(totalL.toFixed(2)).toBe("21732.71");
+    // unchanged) — so margin rises to 1,223.05. A later fix (2026-10-01) rolls up
+    // Computer Central's second CHANNEL workspace (bonardiscom) that Coro's usage
+    // audited separately as 1 Endpoint unit: +1 unit → L +3.20 (21,735.91), margin
+    // +3.20 (1,226.25), and usage now ties the invoice's 167 (INVOICE_QTY_DISAGREES
+    // clears). See src/ingest/usageReduce.ts channel roll-up.
+    expect(totalL.toFixed(2)).toBe("21735.91");
     expect(totalHActual.toFixed(2)).toBe("19907.41");
-    expect(totalHExpected.toFixed(2)).toBe("18812.39"); // Money-exact 18,812.40; float sum drops a cent
-    expect(totalMargin.toFixed(2)).toBe("1223.05");
+    expect(totalHExpected.toFixed(2)).toBe("18815.34"); // Money-exact 18,815.35; float sum drops a cent
+    expect(totalMargin.toFixed(2)).toBe("1226.25");
   });
 
   it("holds ZERO lines — S3's managed-essentials now bills off-card (Brandon 2026-09-30)", () => {
@@ -202,7 +206,8 @@ describe.skipIf(!hasRealData)("September 2026 rate-card close — real packet", 
       LIST_PRICE_DIVERGES: 2,
       AUDIT_QTY_MISMATCH: 11, // self-contradictory audit strings (same class as August's 8)
       INVOICE_RATE_UNEXPECTED: 9, // Auditlytics USERD 45%, CC endpoint 63%, Live-Tech/S-3 module under-bills
-      INVOICE_QTY_DISAGREES: 1, // Computer Central endpoint: audit 166 vs invoiced 167
+      // INVOICE_QTY_DISAGREES cleared 2026-10-01: Computer Central endpoint now
+      // rolls up bonardiscom's separately-audited unit → usage 167 ties invoice 167.
       PRODUCT_FALLBACK: 3,
       CREDIT_EXPECTED: 7, // $1,875.66 — pending Brandon corrections + S3 off-card cost gap
       RATE_OVERRIDE_APPLIED: 6, // was 8; −3 Net-Tech now match the card (10625), +1 S3 off-card
