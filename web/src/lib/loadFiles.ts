@@ -131,6 +131,18 @@ export function parseSlotBytes(
         if (!isOk(r)) {
           return err(`"${fileName}" does not look like a Coro tax invoice: ${r.error.message}`);
         }
+        // A Coro tax invoice always carries money. A "successful" parse where
+        // EVERY line is $0.00 is some other workbook whose headers happened to
+        // line up — seen 2026-10-28 when the monthly usage report was dropped
+        // here (its Monthly Snapshot tab read as 105 zero-amount lines).
+        if (r.value.length > 0 && r.value.every((l) => l.amount.toCents() === 0)) {
+          const hint = /usage/i.test(fileName)
+            ? " — this looks like the monthly usage report; drop it on the usage slot instead"
+            : "";
+          return err(
+            `"${fileName}" does not look like a Coro tax invoice: every parsed line has a $0.00 amount${hint}`
+          );
+        }
         return ok({
           payload: { slot: "invoice", lines: r.value },
           report: { rowsRead: r.value.length, warnings: [] },

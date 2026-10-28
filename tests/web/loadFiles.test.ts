@@ -73,6 +73,31 @@ describe("parseSlotBytes", () => {
     const r = parseSlotBytes("usage", "noise.xlsx", new Uint8Array([1, 2, 3, 4]), "2026-08");
     expect(isOk(r)).toBe(false);
   });
+
+  it("rejects the monthly usage workbook dropped on the invoice slot (2026-10-28 mixup)", async () => {
+    // The real mistake: the October usage workbook on the optional invoice
+    // slot. The invoice parser happened to read its Monthly Snapshot tab as
+    // 105 lines of $0.00/qty-0 — "worked" on screen, garbage underneath. A
+    // Coro tax invoice always carries money, so an all-zero parse must be
+    // rejected and point back at the usage slot.
+    const XLSX = await import("xlsx");
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      book,
+      XLSX.utils.aoa_to_sheet([
+        ["#", "Workspace", "NS Subscription", "NS Customer", "Status", "Users", "Devices", "Updated At", "Product", "Product Code", "Product Quantity"],
+        [1, "1wireco_I86Q_b", 36140, 45220, "SENT", 41, 0, "Oct 20, 03:03 AM", "CORO_AI_COMPLETE", "COR-COMP-C", 41],
+        [2, "albanyitcom_1NMG_b", 26536, 45220, "SENT", 11, 0, "Oct 20, 03:03 AM", "CORO_AI_LITE", "COR-LTE-C", 11],
+      ]),
+      "Monthly Snapshot"
+    );
+    const bytes = new Uint8Array(XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer);
+    const r = parseSlotBytes("invoice", "MSP Hub_October 2026 Usage.xlsx", bytes, "2026-10");
+    expect(isOk(r)).toBe(false);
+    if (isOk(r)) return;
+    expect(r.error).toMatch(/does not look like a Coro tax invoice/);
+    expect(r.error).toMatch(/usage slot/);
+  });
 });
 
 describe("reviewStorageKey", () => {
