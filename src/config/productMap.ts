@@ -54,6 +54,18 @@ const CURRENT_EXACT: Readonly<Record<string, readonly string[]>> = {
   // that is the current-gen "Coro AI Modules" row, after any card row that
   // ever names the product itself.
   "cor-userd-c": ["coro user data governance", "user data governance", "coro ai modules"],
+  // COR-NETW-C / COR-ENDDG-C — first seen Oct 2026 (invoice 2995: B2B 143 ×
+  // "CORO NETWORK" and Seven Star/NerdBee "CORO ENDPOINT DATA GOVERNANCE",
+  // every line at the partner's exact COR-USERD-C module net — $1.58/$1.72/
+  // $1.42 pattern-identical). Both price like modules: the USERD chain
+  // extended, preferring any card row that ever names the product itself.
+  "cor-netw-c": ["coro network", "network", "network flex", "coro ai modules"],
+  "cor-enddg-c": [
+    "coro endpoint data governance",
+    "endpoint data governance",
+    "endpoint data flex",
+    "coro ai modules",
+  ],
 };
 
 /** MOD code → its product-specific flex row name(s). */
@@ -136,7 +148,10 @@ function miss(vendorSku: string, partner: PricingPartner): RowMatch {
 export function resolvePricingRow(partner: PricingPartner, vendorSku: string): RowMatch {
   const code = vendorSku.trim().toLowerCase();
 
-  if (/-nfr$/.test(code)) {
+  // Both NFR spellings: legacy "…-NFR" and current-gen "…-NFR-C" (Hurricane IT,
+  // Oct 2026 usage COR-COMP-NFR-C). Coro 2026-09-22: "NFR is Not for resale and
+  // carrie[s] no cost".
+  if (/-nfr(-c)?$/.test(code)) {
     return { row: null, kind: "nfr", reason: `${vendorSku} is not-for-resale — never billed` };
   }
 
@@ -155,6 +170,24 @@ export function resolvePricingRow(partner: PricingPartner, vendorSku: string): R
     }
     // No SAT row: SAT is a module — fall through the modules chain.
     return resolveModulesChain(partner, vendorSku, "modules-flex");
+  }
+
+  // COR-SAT-C — first seen Oct 2026 (invoice 2995: S-3 and Seven Star, "CORO
+  // Security Awareness Training" at a FLAT $0.68 net regardless of partner
+  // discount). Brandon (Sept): SAT is the only module NOT priced like a module
+  // — so unlike Modsatflex there is NO modules-chain fallback here. A card
+  // without a SAT row holds honestly (Seven Star's, 2026-10 sheet) until Coro
+  // rates it.
+  if (code === "cor-sat-c") {
+    const sat = findRow(partner, [
+      "coro security awareness training",
+      "security awareness training",
+      "sat flex",
+    ]);
+    if (sat) {
+      return { row: sat, kind: "sat-flex", reason: `${vendorSku} → "${sat.product}"` };
+    }
+    return miss(vendorSku, partner);
   }
 
   if (code.startsWith("mod")) {

@@ -304,3 +304,72 @@ describe("resolvePricingRow — 2026-09-22 sheet revision (Coro's answers)", () 
     expect(m.row!.product).toBe("Coro Classic Flex");
   });
 });
+
+describe("resolvePricingRow — October 2026 packet (invoice 2995, Monthly-Snapshot usage)", () => {
+  it("marks COR-COMP-NFR-C non-billable (the current-gen NFR spelling, Hurricane IT)", () => {
+    const p = partner("Hurricane IT", [row("Coro AI Complete", "12.00")]);
+    const m = resolvePricingRow(p, "COR-COMP-NFR-C");
+    expect(m.kind).toBe("nfr");
+    expect(m.row).toBeNull();
+  });
+
+  it("maps COR-NETW-C to the current-gen 'Coro AI Modules' row (B2B Technologies idiom)", () => {
+    // Invoice 2995 bills CORO NETWORK at the per-partner module net (B2B 143 ×
+    // $1.58 — the same net as the Coro-confirmed COR-USERD-C module rate), so
+    // NETWORK prices like a module: the COR-USERD-C chain extended.
+    const b2b = partner("B2B Technologies", [
+      row("Coro AI Essentials", "3.15", "7.50"),
+      row("Coro AI Modules", "1.92", "7.50"),
+    ]);
+    const m = resolvePricingRow(b2b, "COR-NETW-C");
+    expect(m.kind).toBe("exact");
+    expect(m.row!.product).toBe("Coro AI Modules");
+  });
+
+  it("prefers a card row naming Network itself, should one appear", () => {
+    const future = partner("Future Sheet", [
+      row("Network Flex", "2.10", "3.75"),
+      row("Coro AI Modules", "1.92", "7.50"),
+    ]);
+    expect(resolvePricingRow(future, "COR-NETW-C").row!.product).toBe("Network Flex");
+  });
+
+  it("maps COR-ENDDG-C to the modules row (Seven Star / NerdBee idiom)", () => {
+    // CORO ENDPOINT DATA GOVERNANCE invoices at the per-partner module net
+    // (NerdBee $1.73 ENDDG = $1.73 USERD) — a module, like USERD.
+    const nerdbee = partner("The NerdBee", [
+      row("Coro AI Essentials", "3.15", "7.50"),
+      row("Coro AI Modules", "1.92", "7.50"),
+    ]);
+    const m = resolvePricingRow(nerdbee, "COR-ENDDG-C");
+    expect(m.kind).toBe("exact");
+    expect(m.row!.product).toBe("Coro AI Modules");
+  });
+
+  it("returns none for COR-NETW-C / COR-ENDDG-C without a modules row — never invents", () => {
+    const bare = partner("Bare", [row("Coro AI Complete", "12.00")]);
+    expect(resolvePricingRow(bare, "COR-NETW-C").kind).toBe("none");
+    expect(resolvePricingRow(bare, "COR-ENDDG-C").kind).toBe("none");
+  });
+
+  it("maps COR-SAT-C to the partner's 'SAT Flex' row (S-3 idiom)", () => {
+    const s3 = partner("S-3", [
+      row("Coro AI Modules", "1.92", "7.50"),
+      row("SAT Flex", "1.40", "2.00"),
+    ]);
+    const m = resolvePricingRow(s3, "COR-SAT-C");
+    expect(m.kind).toBe("sat-flex");
+    expect(m.row!.netMsp!.toFixed2()).toBe("1.40");
+  });
+
+  it("COR-SAT-C never falls through the modules chain — Seven Star holds honestly", () => {
+    // Brandon (Sept): SAT is the only module NOT priced like a module, and
+    // Coro's actual COR-SAT-C net is a flat $0.68 — far below module rates.
+    // A card without a SAT row must hold, not silently bill the modules rate.
+    const sevenStar = partner("Seven Star Systems", [
+      row("Coro AI Modules", "1.92", "7.50"),
+      row("Modules Flex", "2.10", "4.00"),
+    ]);
+    expect(resolvePricingRow(sevenStar, "COR-SAT-C").kind).toBe("none");
+  });
+});

@@ -36,15 +36,32 @@ export function stripWorkspaceSuffix(slug: string): string {
  * s3svccom is carded "S-3" but invoiced "Security Solutions Services dba S3",
  * and copperbandtechcom is carded "Copperband Technologies, LLC" but invoiced
  * without the ", LLC".
+ *
+ * October 2026 packet (invoice INVCUS2026-0002995 + the Oct usage workbook)
+ * added sixteen parents. Names are invoice 2995's exact spellings — several
+ * diverge from the card: bb-networkscom is carded "B2B Technologies" but
+ * invoiced "BB-Networks AKA B2B Technologies", simplify-technet is carded
+ * "Simplify Tech (NPTech)" but invoiced "NPTech dba Simplify Tech", ecsllccom
+ * is carded "Evans Consulting Servies LLC" (sic) but invoiced "Evans
+ * Consulting Services LLC (MSP)", and "Tec- Exchange, Inc" carries Coro's
+ * stray space.
  */
 export const PARTNER_SLUG_MAP: Readonly<Record<string, string>> = {
+  "1wireco": "1Wire Fiber",
   albanyitcom: "Albany IT",
   amplivitycom: "Amplivity",
+  aspiretechnicalcom: "Aspire Technical",
+  assuremspcom: "Assure MSP",
   auditlyticscom: "Auditlytics",
+  avaropointcom: "Avaropoint",
+  "bb-networkscom": "BB-Networks AKA B2B Technologies",
   beneintcom: "BeNe International",
+  citetechnologysolutionscorocom: "Cite Technology Solutions",
   computercentralbiz: "Computer Central",
   copperbandtechcom: "Copperband Technologies",
   "cyber-constructioncom": "Cyber Construction",
+  "dk-systemscom": "DK Systems",
+  ecsllccom: "Evans Consulting Services LLC (MSP)",
   evolvewithuscom: "Evolve Technologies",
   forcetechitcom: "Forcetech IT, LLC",
   "goa-techcom": "GOA-TECH",
@@ -52,14 +69,22 @@ export const PARTNER_SLUG_MAP: Readonly<Record<string, string>> = {
   ictcom: "ICT",
   idealtechhelp: "Ideal Tech Help",
   itnsgroupcom: "IT Network Solutions Group LLC",
+  "logic-itcom": "Logic-IT (Rome, GA)",
   meetingtreecomputercom: "Meeting Tree Computer",
   "mylive-techcom": "Live-Tech",
   "net-techus": "Net-Tech Consulting",
+  rexblackcom: "Rex Black",
   rockerio: "Rocker",
   s3svccom: "Security Solutions Services dba S3",
+  sevenstarsystemscom: "Seven Star Systems",
+  seviscom: "Sevis Systems",
+  "simplify-technet": "NPTech dba Simplify Tech",
+  "tec-exchangeinccom": "Tec- Exchange, Inc",
   techlpcom: "Techlead Professional Services LLC",
   techshieldmspus: "Techshield MSP",
   teledatauscom: "Teledata Cloud Services",
+  thenerdbeecom: "The NerdBee",
+  titaniumcomputingcom: "Titanium Computing",
   vaimancom: "AVOX LLC",
   viener4gatescom: "Viener4Gates",
   xtbsolutionscom: "XTB Solutions",
