@@ -268,3 +268,72 @@ describe("parseUsage — per-partner 'by product' export (July 2026 TechLead sch
     expect(ess!.sku.isLegacy).toBe(true); // Billing Mode LEGACY
   });
 });
+
+describe("parseUsage — October 2026 delivered workbook (Monthly Snapshot / Aggregation / Usage tabs)", () => {
+  // Real schema from "MSP Hub_October 2026 Usage.xlsx" (Lisa's 2026-10-28 email).
+  // Coro renamed the Usage-tab headers: the partner is now "Parent" (was "Parent
+  // Workspace"), the customer is "End-User (Child) Workspace" (was "Workspace"),
+  // the billed quantity is "Product Quantity" (was "Quantity"), and the Metric
+  // column is GONE — each (workspace, SKU) appears once, quantity already billed,
+  // with the metric rule embedded in the Audit string ("...=41 [users]").
+  const OCT_HEADER = [
+    "#", "Parent", "End-User (Child) Workspace", "Type", "Sub Type",
+    "Billing Mode", "Region", "Audit", "Product", "Product Code", "Product Quantity",
+  ];
+
+  /** The delivered file's three tabs — Usage is LAST; pickSheet must find it by name. */
+  function octWb(usageRows: (string | number | boolean | null)[][]): WorkbookInput {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      book,
+      XLSX.utils.aoa_to_sheet([
+        ["#", "Workspace", "NS Subscription", "NS Customer", "Status", "Users", "Devices", "Updated At", "Product", "Product Code", "Product Quantity"],
+        [1, "1wireco_I86Q_b", 36140, 45220, "SENT", 41, 0, "Oct 20, 03:03 AM", "CORO_AI_COMPLETE", "COR-COMP-C", 41],
+      ]),
+      "Monthly Snapshot"
+    );
+    XLSX.utils.book_append_sheet(
+      book,
+      XLSX.utils.aoa_to_sheet([
+        ["Group Key", "Type", "Billing Mode", "Users", "Devices", "Product", "Product Code", "Product Quantity"],
+        ["1wireco_I86Q_b", "CHANNEL", "NEW", 41, 0, "CORO_AI_COMPLETE", "COR-COMP-C", 41],
+      ]),
+      "Aggregation"
+    );
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(usageRows), "Usage");
+    return { workbook: book };
+  }
+
+  it("parses the renamed headers off the Usage tab (not the first sheet)", () => {
+    const r = parseUsage(
+      octWb([
+        OCT_HEADER,
+        [1, "1wireco_I86Q_b", "1wireco_I86Q_b", "CHANNEL", "SUBSCRIPTION", "NEW", "US", "NEW | u=41 d=0 | CORO_AI_COMPLETE=41 [users]", "CORO_AI_COMPLETE", "COR-COMP-C", 41],
+        [2, "1wireco_I86Q_b", "3dteethcom_4MOU_b", "CHILD", "SUBSCRIPTION", "LEGACY", "US", "LEGACY | u=22 d=0 | EMAIL_PROTECTION=22 [users]", "EMAIL_PROTECTION", "BUEMAILflex", 22],
+        [3, "amplivitycom_NE7N_b", "terryandersontaxescom_T8ZE_b", "CHILD", "SUBSCRIPTION", "NEW", "US", "NEW | u=0 d=3 | CORO_AI_ENDPOINT=3 [secondary: devices + mdmActiveDevicesUsage + mdmInactiveDevicesUsage - users * 3]", "CORO_AI_ENDPOINT", "COR-ENDP-C", 3],
+      ]),
+      { period: "2026-10" }
+    );
+    expect(isOk(r)).toBe(true);
+    if (!isOk(r)) return;
+    expect(r.value).toHaveLength(3);
+    const [channel, legacyChild, endpoint] = r.value;
+
+    expect(channel!.partner).toBe("1wireco_I86Q_b"); // "Parent" header
+    expect(channel!.customer).toBe("1wireco_I86Q_b"); // own workspace; reduce folds to null
+    expect(channel!.wsType).toBe("CHANNEL");
+    expect(channel!.quantity).toBe(41); // "Product Quantity" header
+    expect(channel!.sku.vendorSku).toBe("COR-COMP-C");
+    expect(channel!.sku.class).toBe("current");
+    // No Metric column — quantities are already billed; audit kept as provenance.
+    expect(channel!.metric).toBeUndefined();
+    expect(channel!.audit).toBe("NEW | u=41 d=0 | CORO_AI_COMPLETE=41 [users]");
+
+    expect(legacyChild!.customer).toBe("3dteethcom_4MOU_b"); // "End-User (Child) Workspace"
+    expect(legacyChild!.sku.isLegacy).toBe(true); // Billing Mode LEGACY
+    expect(legacyChild!.sku.class).toBe("legacy");
+    expect(legacyChild!.quantity).toBe(22);
+
+    expect(endpoint!.quantity).toBe(3); // the secondary-rule audit row, qty verbatim
+  });
+});

@@ -54,15 +54,26 @@ export interface ColumnMap {
  *     literal "legacy" as truthy, so it doubles as the legacyFlag;
  *   - each (workspace, SKU) appears TWICE (Metric = Users | Devices); the billed
  *     quantity is derived per the row's own "Audit" rule — see ingest/usageReduce.ts.
+ *
+ * October 2026 delivered workbook (`MSP Hub_October 2026 Usage.xlsx`) renamed the
+ * Usage-tab headers: `# | Parent | End-User (Child) Workspace | Type | Sub Type |
+ * Billing Mode | Region | Audit | Product | Product Code | Product Quantity` (plus
+ * new partner-level "Monthly Snapshot" and "Aggregation" tabs, which we ignore —
+ * pickSheet finds the "Usage" tab by name). The Metric column is GONE: each
+ * (workspace, SKU) appears once with the BILLED quantity, so these rows flow through
+ * usageReduce's pass-through path; the Audit string stays as provenance.
  */
 export const USAGE_COLUMN_MAP: ColumnMap = {
   // "msp parent": the per-partner "…by_product" export (first seen July 2026,
   // TechLead) names the parent column "MSP Parent" instead of "Parent Workspace".
-  partner: ["partner", "partner name", "reseller", "msp", "parent workspace", "msp parent"],
-  customer: ["workspace", "child account", "customer", "account", "tenant"],
+  // Bare "parent" / "end-user (child) workspace" / "product quantity": the
+  // October 2026 delivered workbook. Appended LAST so earlier formats resolve
+  // exactly as before (aliases are tried in order).
+  partner: ["partner", "partner name", "reseller", "msp", "parent workspace", "msp parent", "parent"],
+  customer: ["workspace", "child account", "customer", "account", "tenant", "end-user (child) workspace"],
   sku: ["sku", "sku code", "item", "product code"],
   product: ["product", "product name"],
-  quantity: ["quantity", "qty", "units", "seats", "count"],
+  quantity: ["quantity", "qty", "units", "seats", "count", "product quantity"],
   subtype: ["subtype", "sub type", "sub-type"],
   legacyFlag: ["legacy", "is legacy", "legacy flag", "billing mode"],
   billingFlag: ["billing", "billing flag"],
