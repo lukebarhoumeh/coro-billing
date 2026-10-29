@@ -30,7 +30,11 @@
  *   - Coro again invoiced the Hub's own workspace (74 × COR-COMP-C, $610.50,
  *     "MSP Hub - Disti/MSP") with no usage row — the continuing challenge;
  *   - legacy-discount credits are nearly done: CREDIT_EXPECTED is $0.16
- *     (ForceTech MODNETWflex 1.88 vs 1.72) — Brandon's fixes landed.
+ *     (ForceTech MODNETWflex 1.88 vs 1.72) — Brandon's fixes landed;
+ *   - GOA-Tech's Classic drafts the card's 7.20 (Lida's 2026-10-29 wrong-price
+ *     report: the stale 6.59 confirmed rate — which is the Hub COST — retired
+ *     through 2026-09), leaving October with ZERO rate overrides: the whole
+ *     month prices straight off the card.
  */
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
@@ -79,18 +83,31 @@ describe.skipIf(!hasRealData)("October 2026 rate-card close — real packet", ()
     expect(model.findings.filter((f) => f.kind === "UNMAPPED_PARTNER")).toEqual([]);
   });
 
-  it("foots the month: L $32,239.44, actual H $27,484.89, margin $4,144.05", () => {
+  it("foots the month: L $32,247.98, actual H $27,484.89, margin $4,152.59", () => {
     const totalL = model.partners.reduce((s, p) => s + p.totalL.toNumber(), 0);
     const totalHActual = model.partners.reduce((s, p) => s + (p.totalHActual?.toNumber() ?? 0), 0);
     const totalMargin = model.partners.reduce((s, p) => s + p.totalMargin.toNumber(), 0);
     // Invoice 2995 foots to 28,404.60; actual-H joins 27,484.89 of it. The
     // unjoined 919.71 is exactly the three machine-flagged lines: the Hub-self
     // bill 610.50 (no usage), Computer Central's 2026-09 catch-up 150.30
-    // (out-of-period), and Seven Star's held SAT 158.91.
-    expect(totalL.toFixed(2)).toBe("32239.44");
+    // (out-of-period), and Seven Star's held SAT 158.91. (L was 32,239.44
+    // until 2026-10-29: GOA-Tech's Classic re-drafted 6.59 → 7.20, +8.54.)
+    expect(totalL.toFixed(2)).toBe("32247.98");
     expect(totalHActual.toFixed(2)).toBe("27484.89");
-    expect(totalMargin.toFixed(2)).toBe("4144.05");
+    expect(totalMargin.toFixed(2)).toBe("4152.59");
     expect(model.totalCreditExpected.toFixed2()).toBe("0.16");
+  });
+
+  it("drafts GOA-Tech's Classic at the card's 7.20 — no rate override anywhere in October", () => {
+    // Lida, 2026-10-29: "the app selected the wrong price" — the stale 6.59
+    // confirmed rate (= Hub cost, 11.99 × 55%) retired through 2026-09; the
+    // card col E (7.20) rules from October on. 14 × 7.20 = 100.80.
+    const goa = model.partners.find((p) => p.cardName === "GOA-Tech")!;
+    const classic = goa.lines.find((l) => l.vendorSku === "BUCOCLASSflex")!;
+    expect(classic.quantity).toBe(14);
+    expect(classic.unitL!.toFixed2()).toBe("7.20");
+    expect(goa.totalL.toFixed2()).toBe("139.80"); // 100.80 + 3×5.00 + 6×4.00
+    expect(model.findings.filter((f) => f.kind === "RATE_OVERRIDE_APPLIED")).toEqual([]);
   });
 
   it("holds exactly ONE line: Seven Star's 233 × COR-SAT-C (no SAT row — never module-priced)", () => {

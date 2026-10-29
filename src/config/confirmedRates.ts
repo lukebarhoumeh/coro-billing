@@ -30,7 +30,7 @@ import type { Period } from "../domain/types.js";
  * qbo.ts) — bump on ANY table change so stale approvals and pushed-state from
  * the previous rates invalidate instead of silently attaching to new numbers.
  */
-export const CONFIRMED_RATES_REVISION = 2; // bumped 2026-09-30: Net-Tech rates corrected to invoice 10625
+export const CONFIRMED_RATES_REVISION = 3; // bumped 2026-10-29: GOA-Tech Classic retired to the card from October (Lida's wrong-price report)
 
 export interface ConfirmedRate {
   readonly rate: Money;
@@ -47,6 +47,15 @@ interface Entry {
    * before Coro moved it to modern bundles). Omit for period-stable rates.
    */
   readonly period?: Period;
+  /**
+   * When set, the entry applies to every period up to AND INCLUDING this one,
+   * then retires to the card — for a rate that was genuinely billed for several
+   * months before accounting adopted the card's price (e.g. GOA-Tech's Classic).
+   * Periods are "YYYY-MM" so lexicographic comparison is chronological.
+   * Never set BOTH `period` and `through` — a contradictory combo (period
+   * after through) would make the entry silently dead.
+   */
+  readonly through?: Period;
 }
 
 /** Keyed `${card name, lowercased}|${vendor SKU, lowercased}`. */
@@ -57,7 +66,10 @@ const TABLE: Readonly<Record<string, Entry>> = {
   // --- Cyber Construction (her QB: Cyber Construction, Inc.) ---
   "cyber construction|bucoroflex": { rate: "6.00", source: "QB inv 10597, 31×6.00" },
   "cyber construction|bucomflex": { rate: "8.90", source: "QB inv 10597, 3×8.90" },
-  "cyber construction|bucoclassflex": { rate: "6.59", source: "QB inv 10597, 41×6.59" },
+  // 6.59 = Hub Classic COST (11.99 × 55%) — the same zero-margin trap Lida
+  // flagged on GOA-Tech 2026-10-29. Cyber is migrated off Classic (no Sept/Oct
+  // usage); retired through Sept so a reappearance prices from the card.
+  "cyber construction|bucoclassflex": { rate: "6.59", source: "QB inv 10597, 41×6.59", through: "2026-09" },
   "cyber construction|bucoclassmnflex": { rate: "9.35", source: "QB inv 10597, 10×9.35" },
   "cyber construction|modemailflex": { rate: "2.50", source: "QB inv 10597, modules at 2.50" },
   "cyber construction|modenddataflex": { rate: "2.50", source: "QB inv 10597, modules at 2.50" },
@@ -91,11 +103,18 @@ const TABLE: Readonly<Record<string, Entry>> = {
   "evolve technologies|modsatflex": { rate: "1.10", source: "QB inv 10600, 6×1.10" },
 
   // --- GOA-Tech ---
-  "goa-tech|bucoclassflex": { rate: "6.59", source: "QB inv 10551, 14×6.59" },
+  // 6.59 is what her AUGUST QB invoice billed — but it equals the Hub COST
+  // (Classic flat-45: 11.99 × 55% = 6.5945), i.e. zero margin. Kept through
+  // Sept to preserve the pinned close (Sept was invoiced manually; no GOA
+  // artifact in repo). Lida flagged the October draft 2026-10-29 ("the app
+  // selected the wrong price") — the card's 7.20 rules from Oct on.
+  "goa-tech|bucoclassflex": { rate: "6.59", source: "QB inv 10551, 14×6.59", through: "2026-09" },
 
   // --- Rocker (her QB: Rocker LLC) — see header note; no Aug usage for these ---
   "rocker|bucomflex": { rate: "8.25", source: "QB inv 10558/10601, 11×8.25" },
-  "rocker|bucoclassflex": { rate: "6.60", source: "QB inv 10558/10601, 56×6.60" },
+  // 6.60 ≈ Hub Classic COST — same zero-margin trap as GOA-Tech/Cyber; retired
+  // through Sept (never fired in any close) so a reappearance prices from the card.
+  "rocker|bucoclassflex": { rate: "6.60", source: "QB inv 10558/10601, 56×6.60", through: "2026-09" },
 
   // --- Teledata Cloud Services (her QB: TDI Technologies, Inc.) ---
   "teledata cloud services|bucoroflex": { rate: "6.00", source: "QB inv 10599 (TDI), 4×6.00" },
@@ -117,5 +136,7 @@ export function resolveConfirmedRate(
   if (entry === undefined) return null;
   // A period-gated entry (a historical rate) applies only to its own period.
   if (entry.period !== undefined && entry.period !== period) return null;
+  // A through-gated entry retires to the card after its last confirmed month.
+  if (entry.through !== undefined && period > entry.through) return null;
   return { rate: Money.of(entry.rate), source: entry.source };
 }
